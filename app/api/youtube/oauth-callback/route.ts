@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/oauth/callback";
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/youtube/oauth-callback";
 
   if (!clientId || !clientSecret) {
     return NextResponse.json({ ok: false, message: "Google OAuth ortamı eksik." }, { status: 500 });
