@@ -18,7 +18,7 @@ export function validateVideoPipelineConfig(): ConfigValidationResult {
 
   return {
     ok: false,
-    missing: ["OPENAI_API_KEY or ELEVENLABS_API_KEY"],
+    missing: ["OPENAI_API_KEY or ELEVENLABS_API_KEY (TTS provider)"],
   };
 }
 

@@ -36,8 +36,20 @@ async function writeJobStatus(jobDir: string, status: JobStatus): Promise<void> 
 export async function POST(request: Request) {
   const jobId = crypto.randomUUID();
   const jobDir = path.join(outputRoot, jobId);
+  let currentStage = "request-validation";
 
   try {
+    const updateStage = async (stage: string, message: string): Promise<void> => {
+      currentStage = stage;
+      await writeJobStatus(jobDir, {
+        jobId,
+        status: "running",
+        stage,
+        updatedAt: new Date().toISOString(),
+        message,
+      });
+    };
+
     const payload = (await request.json()) as JobPayload;
     const validationError = validateJobPayload(payload);
 
@@ -85,13 +97,7 @@ export async function POST(request: Request) {
     const scenesDir = path.join(jobDir, "scenes");
     await fs.mkdir(scenesDir, { recursive: true });
 
-    await writeJobStatus(jobDir, {
-      jobId,
-      status: "running",
-      stage: "script",
-      updatedAt: new Date().toISOString(),
-      message: "Senaryo oluşturuluyor",
-    });
+    await updateStage("script", "Senaryo oluşturuluyor");
 
     const scriptLines = await generateScript({ title, topic, audience, tone, duration });
     const scriptText = scriptLines.join("\n");
@@ -100,13 +106,7 @@ export async function POST(request: Request) {
       throw new Error("AI senaryosu oluşturulamadı.");
     }
 
-    await writeJobStatus(jobDir, {
-      jobId,
-      status: "running",
-      stage: "scene-splitting",
-      updatedAt: new Date().toISOString(),
-      message: "Sahneler hazırlanıyor",
-    });
+    await updateStage("scene-splitting", "Sahneler hazırlanıyor");
 
     const scenes = splitIntoScenes(scriptText);
     if (!scenes.length) {
@@ -122,13 +122,7 @@ export async function POST(request: Request) {
       const sceneDir = path.join(scenesDir, String(index + 1));
       await fs.mkdir(sceneDir, { recursive: true });
 
-      await writeJobStatus(jobDir, {
-        jobId,
-        status: "running",
-        stage: `scene-${index + 1}`,
-        updatedAt: new Date().toISOString(),
-        message: `Sahne ${index + 1}/${scenes.length} üretiliyor`,
-      });
+      await updateStage(`scene-${index + 1}`, `Sahne ${index + 1}/${scenes.length} üretiliyor`);
 
       const generatedImage = await generateImage({ prompt: scene.visualPrompt, size: "1024x1024" });
       const imagePath = path.join(sceneDir, "image.png");
@@ -173,13 +167,7 @@ export async function POST(request: Request) {
       timeline += sceneDuration;
     }
 
-    await writeJobStatus(jobDir, {
-      jobId,
-      status: "running",
-      stage: "merge",
-      updatedAt: new Date().toISOString(),
-      message: "Sahneler birleştiriliyor",
-    });
+    await updateStage("merge", "Sahneler birleştiriliyor");
 
     const baseVideo = path.join(jobDir, "video-base.mp4");
     await concatVideos(renderedScenes, baseVideo);
@@ -204,13 +192,7 @@ export async function POST(request: Request) {
     let youtubeResult: { videoId: string; url: string } | null = null;
 
     if (uploadToYouTube) {
-      await writeJobStatus(jobDir, {
-        jobId,
-        status: "running",
-        stage: "youtube-upload",
-        updatedAt: new Date().toISOString(),
-        message: "YouTube yüklemesi başladı",
-      });
+      await updateStage("youtube-upload", "YouTube yüklemesi başladı");
 
       youtubeResult = await uploadYouTubeVideo({
         filePath: finalVideo,
@@ -262,7 +244,7 @@ export async function POST(request: Request) {
       await writeJobStatus(jobDir, {
         jobId,
         status: "failed",
-        stage: "video-generation",
+        stage: currentStage,
         updatedAt: new Date().toISOString(),
         message,
       });
@@ -277,7 +259,7 @@ export async function POST(request: Request) {
         ok: false,
         jobId,
         message,
-        stage: "video-generation",
+        stage: currentStage,
       },
       {
         status: 500,

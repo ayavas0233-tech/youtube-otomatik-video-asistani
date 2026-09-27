@@ -1,4 +1,5 @@
 import { openai } from "@/lib/openai";
+import { generateSpeechWithFallback } from "@/lib/tts-fallback";
 
 const openAiVoiceMap: Record<string, "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer"> = {
   "Turkish Female 01": "shimmer",
@@ -89,16 +90,13 @@ export async function generateSpeech({
 
   const safeSpeed = Math.max(0.5, Math.min(speed, 2));
 
-  if (process.env.ELEVENLABS_API_KEY) {
-    try {
-      return await generateWithElevenLabs(text, voice);
-    } catch (error) {
-      console.error("ElevenLabs TTS fallback to OpenAI:", error);
-    }
-  }
-
   try {
-    return await generateWithOpenAI(text, voice, safeSpeed);
+    return await generateSpeechWithFallback({
+      text,
+      hasElevenLabsKey: Boolean(process.env.ELEVENLABS_API_KEY),
+      tryElevenLabs: () => generateWithElevenLabs(text, voice),
+      tryOpenAI: () => generateWithOpenAI(text, voice, safeSpeed),
+    });
   } catch (error) {
     console.error("OpenAI TTS failed:", error);
     throw error;

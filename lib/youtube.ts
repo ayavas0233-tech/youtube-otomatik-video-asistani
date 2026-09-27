@@ -34,7 +34,11 @@ function createOAuthClient() {
   return oauth;
 }
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  shouldRetry?: (error: unknown) => boolean,
+): Promise<T> {
   let attempt = 0;
 
   while (true) {
@@ -44,7 +48,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
       attempt += 1;
       const status = (error as { code?: number; response?: { status?: number } })?.response?.status || (error as { code?: number })?.code;
 
-      if (attempt > retries || !status || !RETRYABLE_CODES.has(Number(status))) {
+      if (
+        attempt > retries ||
+        !status ||
+        !RETRYABLE_CODES.has(Number(status)) ||
+        (shouldRetry ? !shouldRetry(error) : false)
+      ) {
         throw error;
       }
 
@@ -69,32 +78,46 @@ export async function uploadYouTubeVideo(params: UploadParams): Promise<UploadRe
 
   const stat = fs.statSync(params.filePath);
 
-  const insertResponse = await youtube.videos.insert(
-    {
-      part: ["snippet", "status"],
-      requestBody: {
-        snippet: {
-          title: params.title,
-          description: params.description,
-          tags: params.tags,
-          categoryId: "27",
+  const insertWithSafeRetry = async () => {
+    let uploadedBytes = 0;
+
+    return withRetry(
+      async () => {
+      uploadedBytes = 0;
+
+      return youtube.videos.insert(
+        {
+          part: ["snippet", "status"],
+          requestBody: {
+            snippet: {
+              title: params.title,
+              description: params.description,
+              tags: params.tags,
+              categoryId: "27",
+            },
+            status: {
+              privacyStatus: params.privacyStatus || "private",
+              selfDeclaredMadeForKids: false,
+            },
+          },
+          media: {
+            body: fs.createReadStream(params.filePath),
+          },
         },
-        status: {
-          privacyStatus: params.privacyStatus || "private",
-          selfDeclaredMadeForKids: false,
+        {
+          onUploadProgress: (event) => {
+            uploadedBytes = event.bytesRead || 0;
+            params.onProgress?.(uploadedBytes, stat.size);
+          },
         },
+      );
       },
-      media: {
-        body: fs.createReadStream(params.filePath),
-      },
-    },
-    {
-      onUploadProgress: (event) => {
-        const uploaded = event.bytesRead || 0;
-        params.onProgress?.(uploaded, stat.size);
-      },
-    },
-  );
+      3,
+      () => uploadedBytes === 0,
+    );
+  };
+
+  const insertResponse = await insertWithSafeRetry();
 
   const videoId = insertResponse.data.id;
 

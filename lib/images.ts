@@ -39,10 +39,11 @@ export async function generateImage({
   }
 
   try {
+    const modelSize = size === "1280x720" ? "1792x1024" : size;
     const response = await openai.images.generate({
       model: "gpt-image-1",
       prompt: trimmed,
-      size: size === "1280x720" ? "1024x1024" : size,
+      size: modelSize,
     });
 
     const first = response.data?.[0];
