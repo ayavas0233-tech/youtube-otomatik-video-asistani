@@ -1,64 +1,77 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { createJob, listJobs } from "@/lib/job-queue";
+import { VideoJobPayload } from "@/lib/job-types";
+import { startJobWorker } from "@/lib/job-worker";
 
-const outputDir = path.join(process.cwd(), "tmp");
+function isValidPayload(payload: unknown): payload is VideoJobPayload {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  const maybe = payload as Partial<VideoJobPayload>;
+  return typeof maybe.topic === "string" && maybe.topic.trim().length > 0;
+}
 
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
+    if (!isValidPayload(payload)) {
+      return Response.json(
+        { ok: false, message: "Geçerli bir topic alanı zorunludur." },
+        { status: 400 },
+      );
+    }
 
-    const title = payload.title || "Yapay Zeka ile Kâr Edin";
-    const topic = payload.topic || "Güncel AI iş fırsatları";
-    const tone = payload.tone || "Motivasyonlu ve net";
-    const duration = payload.duration || "6 dakika";
+    const job = createJob({
+      title: payload.title,
+      topic: payload.topic.trim(),
+      audience: payload.audience,
+      tone: payload.tone,
+      duration: payload.duration,
+      voice: payload.voice,
+      uploadToYouTube: payload.uploadToYouTube,
+      privacyStatus: payload.privacyStatus,
+    });
 
-    await fs.mkdir(outputDir, { recursive: true });
+    startJobWorker(job.jobId);
 
-    const script = [
-      "Giriş: İzleyici için çarpıcı bir açılış cümlesi hazırlandı.",
-      `Ana konu: ${topic} üzerine net ve anlaşılır açıklama yazıldı.`,
-      `Ton: ${tone} anlatım biçimiyle üretim yapıldı.`,
-      `Süre hedefi: ${duration}.`,
-      "Kapanış: CTA ve sonraki adım çağrısı eklendi.",
-    ];
-
-    const subtitle = [
-      "00:00:00,000 --> 00:00:03,000 | Merhaba ve hoş geldiniz.",
-      "00:00:03,000 --> 00:00:10,000 | Bu videoda AI ve üretim akışını açıklıyoruz.",
-      "00:00:10,000 --> 00:00:18,000 | Net bir yapı kurmak, verimliliği artırır.",
-      "00:00:18,000 --> 00:00:25,000 | Ardından üretim ve yükleme aşamasına geçiyoruz.",
-      "00:00:25,000 --> 00:00:30,000 | İyi seyirler.",
-    ];
-
-    const output = {
-      ok: true,
-      title,
-      topic,
-      duration,
-      script,
-      subtitle,
-      thumbnailPrompt: `Modern YouTube thumbnail, ${topic}, net yazı, canlı renkler, teknoloji teması, premium görünüm, yüksek kontrast`,
-      ffmpegPlan: [
-        "Görsel kartları sırala",
-        "TTS ses dosyasını ekle",
-        "FFmpeg ile kes, geçiş ve birleştirme uygula",
-        "Altyazı dosyasını ekle",
-        "Thumbnail oluştur",
-      ],
-      youtubeMetadata: {
-        title: `${title} | ${topic}`,
-        description: `Bu video ${topic} konusunu anlatır.\n\nAI üretim akışı, TTS, görseller, altyazı ve YouTube dağıtım süreci açıklanır.`,
-        tags: ["ai", "youtube", "video", "automation", topic.toLowerCase()],
+    return Response.json(
+      {
+        ok: true,
+        jobId: job.jobId,
+        message: "Job queued for processing",
+        statusUrl: `/api/video/job/${job.jobId}`,
       },
-      generatedAt: new Date().toISOString(),
-    };
-
-    const filePath = path.join(outputDir, "video-job.json");
-    await fs.writeFile(filePath, JSON.stringify(output, null, 2));
-
-    return Response.json(output);
+      { status: 202 },
+    );
   } catch (error) {
-    console.error("video-job generation failed", error);
-    return Response.json({ ok: false, message: "Video iş akışı üretilemedi." }, { status: 500 });
+    console.error("video-job enqueue failed", error);
+    return Response.json(
+      { ok: false, message: "Video işi kuyruğa alınamadı." },
+      { status: 500 },
+    );
   }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+  const jobs = listJobs(
+    status === "PENDING" ||
+      status === "PROCESSING" ||
+      status === "COMPLETED" ||
+      status === "FAILED"
+      ? status
+      : undefined,
+  );
+
+  return Response.json({
+    ok: true,
+    jobs: jobs.map((job) => ({
+      jobId: job.jobId,
+      status: job.status,
+      progress: job.progress,
+      currentStep: job.currentStep,
+      createdAt: job.createdAt.toISOString(),
+      updatedAt: job.updatedAt.toISOString(),
+    })),
+  });
 }
