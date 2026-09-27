@@ -7,6 +7,7 @@ import { JobRecord, JobResult, JobStatus, VideoJobPayload } from "@/lib/job-type
 const RETENTION_HOURS = 24;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
 const RETENTION_MS = RETENTION_HOURS * 60 * 60 * 1000;
+const LOCK_TIMEOUT_MS = 5000;
 const STORE_DIR = path.join(process.cwd(), "tmp", "video-jobs-store");
 
 function ensureStoreDir(): void {
@@ -44,7 +45,7 @@ async function withJobLock<T>(
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
         return undefined;
       }
-      if (Date.now() - lockStart > 500) {
+      if (Date.now() - lockStart > LOCK_TIMEOUT_MS) {
         return undefined;
       }
       await wait(10);
