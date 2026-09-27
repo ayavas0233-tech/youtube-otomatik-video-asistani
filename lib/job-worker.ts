@@ -141,7 +141,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         };
       }
 
-      await completeJob(
+      const completion = await completeJob(
         jobId,
         {
           title: job.payload.title || "Yapay Zeka ile Kâr Edin",
@@ -155,6 +155,9 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         },
         workerId,
       );
+      if (!completion) {
+        throw new Error("Job completion state could not be persisted.");
+      }
       return;
     } catch (error) {
       const current = getJob(jobId);

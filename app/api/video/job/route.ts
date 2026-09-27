@@ -61,14 +61,18 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
-  const jobs = listJobs(
-    status === "PENDING" ||
-      status === "PROCESSING" ||
-      status === "COMPLETED" ||
-      status === "FAILED"
-      ? status
-      : undefined,
-  );
+  const validStatuses = ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] as const;
+  if (status && !validStatuses.includes(status as (typeof validStatuses)[number])) {
+    return Response.json(
+      {
+        ok: false,
+        message: "Invalid status filter. Use PENDING, PROCESSING, COMPLETED, or FAILED.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const jobs = listJobs(status as (typeof validStatuses)[number] | undefined);
 
   return Response.json({
     ok: true,

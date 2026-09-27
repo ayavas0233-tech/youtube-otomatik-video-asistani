@@ -280,12 +280,12 @@ export async function incrementJobAttemptsForWorker(
   });
 }
 
-export function cleanupExpiredJobs(): void {
+export async function cleanupExpiredJobs(): Promise<void> {
   ensureStoreDir();
   const now = Date.now();
   for (const job of listAllJobs()) {
     if (job.expiresAt.getTime() <= now) {
-      void withJobLock(job.jobId, async () => {
+      await withJobLock(job.jobId, async () => {
         const latest = readJob(job.jobId);
         if (!latest || latest.expiresAt.getTime() <= now) {
           const filePath = jobPath(job.jobId);
@@ -304,7 +304,7 @@ const cleanupState = globalThis as typeof globalThis & {
 
 if (!cleanupState.__videoJobCleanupStarted) {
   setInterval(() => {
-    cleanupExpiredJobs();
+    void cleanupExpiredJobs();
   }, CLEANUP_INTERVAL_MS).unref();
   cleanupState.__videoJobCleanupStarted = true;
 }
