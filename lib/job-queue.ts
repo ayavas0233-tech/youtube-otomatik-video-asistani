@@ -23,30 +23,36 @@ function jobLockPath(jobId: string): string {
   return path.join(STORE_DIR, `${jobId}.lock`);
 }
 
-function withJobLock<T>(jobId: string, operation: () => T): T | undefined {
-  const lockPath = jobLockPath(jobId);
-  let lockFd: number | undefined;
-  const lockStart = Date.now();
-  const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
-  while (typeof lockFd !== "number") {
+async function withJobLock<T>(jobId: string, operation: () => T): Promise<T | undefined> {
+  const lockPath = jobLockPath(jobId);
+  let lockHandle: fs.promises.FileHandle | undefined;
+  const lockStart = Date.now();
+
+  while (!lockHandle) {
     try {
-      lockFd = fs.openSync(lockPath, "wx");
-    } catch {
+      lockHandle = await fs.promises.open(lockPath, "wx");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        return undefined;
+      }
       if (Date.now() - lockStart > 500) {
         return undefined;
       }
-      Atomics.wait(sleepBuffer, 0, 0, 10);
+      await wait(10);
     }
   }
 
   try {
     return operation();
   } finally {
-    fs.closeSync(lockFd);
-    if (fs.existsSync(lockPath)) {
-      fs.rmSync(lockPath);
-    }
+    await lockHandle.close();
+    await fs.promises.rm(lockPath, { force: true });
   }
 }
 
@@ -152,7 +158,7 @@ export function listJobs(status?: JobStatus): JobRecord[] {
   return jobs.filter((job) => job.status === status);
 }
 
-export function claimJob(jobId: string, workerId: string): JobRecord | undefined {
+export async function claimJob(jobId: string, workerId: string): Promise<JobRecord | undefined> {
   return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job || job.status !== "PENDING") {
@@ -177,7 +183,7 @@ export function updateJobProgress(
   status: JobStatus = "PROCESSING",
   error?: string | null,
   expectedWorkerId?: string,
-): JobRecord | undefined {
+): Promise<JobRecord | undefined> {
   return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job) {
@@ -203,7 +209,7 @@ export function markJobFailed(
   jobId: string,
   error: string,
   expectedWorkerId?: string,
-): JobRecord | undefined {
+): Promise<JobRecord | undefined> {
   return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job) {
@@ -228,7 +234,7 @@ export function completeJob(
   jobId: string,
   result: JobResult,
   expectedWorkerId?: string,
-): JobRecord | undefined {
+): Promise<JobRecord | undefined> {
   return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job) {
@@ -251,26 +257,10 @@ export function completeJob(
   });
 }
 
-export function incrementJobAttempts(jobId: string): JobRecord | undefined {
-  return withJobLock(jobId, () => {
-    const job = readJob(jobId);
-    if (!job) {
-      return undefined;
-    }
-
-    const updated = refreshTimestamps({
-      ...job,
-      attempts: job.attempts + 1,
-    });
-    writeJob(updated);
-    return updated;
-  });
-}
-
-export function incrementJobAttemptsForWorker(
+export async function incrementJobAttemptsForWorker(
   jobId: string,
   workerId: string,
-): JobRecord | undefined {
+): Promise<JobRecord | undefined> {
   return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job || job.workerId !== workerId) {

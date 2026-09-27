@@ -36,7 +36,7 @@ export function startJobWorker(jobId: string): void {
 }
 
 async function processJob(jobId: string, workerId: string): Promise<void> {
-  const claimedJob = claimJob(jobId, workerId);
+  const claimedJob = await claimJob(jobId, workerId);
   if (!claimedJob) {
     return;
   }
@@ -48,7 +48,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         return;
       }
 
-      updateJobProgress(jobId, 10, "Script generation starting", "PROCESSING", null, workerId);
+      await updateJobProgress(jobId, 10, "Script generation starting", "PROCESSING", null, workerId);
       await wait(150);
       const script = await generateScript({
         title: job.payload.title || "Yapay Zeka ile Kâr Edin",
@@ -58,15 +58,15 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         duration: job.payload.duration || "6 dakika",
       });
 
-      updateJobProgress(jobId, 20, "Script generated", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 20, "Script generated", "PROCESSING", undefined, workerId);
       await wait(150);
-      updateJobProgress(jobId, 25, "Scene parsing", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 25, "Scene parsing", "PROCESSING", undefined, workerId);
       await wait(100);
       const scenes = splitIntoScenes(script);
-      updateJobProgress(jobId, 30, "Scenes ready", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 30, "Scenes ready", "PROCESSING", undefined, workerId);
       await wait(100);
 
-      updateJobProgress(
+      await updateJobProgress(
         jobId,
         40,
         "Image generation starting",
@@ -75,19 +75,19 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         workerId,
       );
       await wait(100);
-      updateJobProgress(jobId, 50, "Images generated", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 50, "Images generated", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 60, "TTS generation starting", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 60, "TTS generation starting", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 70, "Audio generated", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 70, "Audio generated", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 75, "Video rendering starting", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 75, "Video rendering starting", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 85, "Videos concatenated", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 85, "Videos concatenated", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 90, "Subtitles burned", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 90, "Subtitles burned", "PROCESSING", undefined, workerId);
       await wait(100);
-      updateJobProgress(jobId, 95, "Thumbnail created", "PROCESSING", undefined, workerId);
+      await updateJobProgress(jobId, 95, "Thumbnail created", "PROCESSING", undefined, workerId);
       await wait(100);
 
       const outputDir = path.join(OUTPUT_ROOT, jobId);
@@ -119,7 +119,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
 
       let youtube: { videoId: string; url: string } | undefined;
       if (job.payload.uploadToYouTube) {
-        updateJobProgress(
+        await updateJobProgress(
           jobId,
           98,
           `YouTube upload starting (${job.payload.privacyStatus || "private"})`,
@@ -141,7 +141,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         };
       }
 
-      completeJob(
+      await completeJob(
         jobId,
         {
           title: job.payload.title || "Yapay Zeka ile Kâr Edin",
@@ -163,13 +163,14 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       }
 
       const errorMessage = toErrorMessage(error);
-      const retryState = incrementJobAttemptsForWorker(jobId, workerId);
+      const retryState = await incrementJobAttemptsForWorker(jobId, workerId);
       if (!retryState) {
         return;
       }
 
-      if (retryState.attempts < retryState.maxAttempts) {
-        updateJobProgress(
+      const nonRetryableError = errorMessage.includes("not configured");
+      if (retryState.attempts < retryState.maxAttempts && !nonRetryableError) {
+        await updateJobProgress(
           jobId,
           current.progress,
           `Retrying (${retryState.attempts}/${retryState.maxAttempts})`,
@@ -177,10 +178,11 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
           errorMessage,
           workerId,
         );
+        await wait(300 * retryState.attempts);
         continue;
       }
 
-      markJobFailed(jobId, errorMessage, workerId);
+      await markJobFailed(jobId, errorMessage, workerId);
       return;
     }
   }
