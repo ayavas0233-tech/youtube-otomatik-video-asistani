@@ -13,8 +13,9 @@ function isValidPayload(payload: unknown): payload is VideoJobPayload {
     maybe.privacyStatus === "private" ||
     maybe.privacyStatus === "public" ||
     maybe.privacyStatus === "unlisted";
+  const privacyUsageValid = maybe.privacyStatus === undefined || maybe.uploadToYouTube === true;
 
-  return validTopic && validPrivacy;
+  return validTopic && validPrivacy && privacyUsageValid;
 }
 
 export async function POST(request: Request) {
@@ -22,7 +23,11 @@ export async function POST(request: Request) {
     const payload = await request.json();
     if (!isValidPayload(payload)) {
       return Response.json(
-        { ok: false, message: "Geçerli bir topic zorunludur. privacyStatus varsa private/public/unlisted olmalıdır." },
+        {
+          ok: false,
+          message:
+            "Geçerli bir topic zorunludur. privacyStatus yalnızca uploadToYouTube=true iken kullanılabilir.",
+        },
         { status: 400 },
       );
     }

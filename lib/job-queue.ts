@@ -116,8 +116,9 @@ function listAllJobs(): JobRecord[] {
     .filter((name) => name.endsWith(".json"))
     .flatMap((name) => {
       try {
-        const raw = fs.readFileSync(path.join(STORE_DIR, name), "utf8");
-        return [fromStored(JSON.parse(raw))];
+        const jobId = name.slice(0, -5);
+        const job = readJob(jobId);
+        return job ? [job] : [];
       } catch {
         return [];
       }

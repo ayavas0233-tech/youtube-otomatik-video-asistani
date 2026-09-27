@@ -172,7 +172,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       }
 
       const nonRetryableError = errorMessage.includes("not configured");
-      if (retryState.attempts < retryState.maxAttempts && !nonRetryableError) {
+      if (retryState.attempts <= retryState.maxAttempts && !nonRetryableError) {
         await updateJobProgress(
           jobId,
           current.progress,
