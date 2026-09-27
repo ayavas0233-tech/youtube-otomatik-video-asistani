@@ -1,7 +1,9 @@
 import { getJob } from "@/lib/job-queue";
+import path from "path";
 
 function toArtifactId(filePath: string): string {
-  const segments = filePath.split("/").filter(Boolean);
+  const normalized = path.normalize(filePath);
+  const segments = normalized.split(/[\\/]+/).filter(Boolean);
   return segments.slice(-2).join("/");
 }
 

@@ -7,7 +7,14 @@ function isValidPayload(payload: unknown): payload is VideoJobPayload {
     return false;
   }
   const maybe = payload as Partial<VideoJobPayload>;
-  return typeof maybe.topic === "string" && maybe.topic.trim().length > 0;
+  const validTopic = typeof maybe.topic === "string" && maybe.topic.trim().length > 0;
+  const validPrivacy =
+    maybe.privacyStatus === undefined ||
+    maybe.privacyStatus === "private" ||
+    maybe.privacyStatus === "public" ||
+    maybe.privacyStatus === "unlisted";
+
+  return validTopic && validPrivacy;
 }
 
 export async function POST(request: Request) {

@@ -55,11 +55,6 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
   }
 
   while (true) {
-    const nextAttempt = incrementJobAttemptsForWorker(jobId, workerId);
-    if (!nextAttempt) {
-      return;
-    }
-
     try {
       const job = getJob(jobId);
       if (!job) {
@@ -168,11 +163,16 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       }
 
       const errorMessage = toErrorMessage(error);
-      if (current.attempts < current.maxAttempts) {
+      const retryState = incrementJobAttemptsForWorker(jobId, workerId);
+      if (!retryState) {
+        return;
+      }
+
+      if (retryState.attempts < retryState.maxAttempts) {
         updateJobProgress(
           jobId,
           current.progress,
-          `Retrying (${current.attempts}/${current.maxAttempts})`,
+          `Retrying (${retryState.attempts}/${retryState.maxAttempts})`,
           "PROCESSING",
           errorMessage,
           workerId,

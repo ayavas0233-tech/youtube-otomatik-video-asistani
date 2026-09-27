@@ -23,6 +23,31 @@ function jobLockPath(jobId: string): string {
   return path.join(STORE_DIR, `${jobId}.lock`);
 }
 
+function withJobLock<T>(jobId: string, operation: () => T): T | undefined {
+  const lockPath = jobLockPath(jobId);
+  const lockStart = Date.now();
+  let lockFd: number | undefined;
+
+  while (typeof lockFd !== "number") {
+    try {
+      lockFd = fs.openSync(lockPath, "wx");
+    } catch {
+      if (Date.now() - lockStart > 500) {
+        return undefined;
+      }
+    }
+  }
+
+  try {
+    return operation();
+  } finally {
+    fs.closeSync(lockFd);
+    if (fs.existsSync(lockPath)) {
+      fs.rmSync(lockPath);
+    }
+  }
+}
+
 function nextExpiryDate(): Date {
   return new Date(Date.now() + RETENTION_MS);
 }
@@ -126,16 +151,7 @@ export function listJobs(status?: JobStatus): JobRecord[] {
 }
 
 export function claimJob(jobId: string, workerId: string): JobRecord | undefined {
-  const lockPath = jobLockPath(jobId);
-  let lockFd: number | undefined;
-
-  try {
-    lockFd = fs.openSync(lockPath, "wx");
-  } catch {
-    return undefined;
-  }
-
-  try {
+  return withJobLock(jobId, () => {
     const job = readJob(jobId);
     if (!job || job.status !== "PENDING") {
       return undefined;
@@ -149,14 +165,7 @@ export function claimJob(jobId: string, workerId: string): JobRecord | undefined
     });
     writeJob(claimed);
     return claimed;
-  } finally {
-    if (typeof lockFd === "number") {
-      fs.closeSync(lockFd);
-    }
-    if (fs.existsSync(lockPath)) {
-      fs.rmSync(lockPath);
-    }
-  }
+  });
 }
 
 export function updateJobProgress(
@@ -167,23 +176,25 @@ export function updateJobProgress(
   error?: string | null,
   expectedWorkerId?: string,
 ): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job) {
-    return undefined;
-  }
-  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
-    return undefined;
-  }
+  return withJobLock(jobId, () => {
+    const job = readJob(jobId);
+    if (!job) {
+      return undefined;
+    }
+    if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
+      return undefined;
+    }
 
-  const updated = refreshTimestamps({
-    ...job,
-    status,
-    progress: Math.max(0, Math.min(100, Math.round(progress))),
-    currentStep,
-    error: error === null ? undefined : (error ?? job.error),
+    const updated = refreshTimestamps({
+      ...job,
+      status,
+      progress: Math.max(0, Math.min(100, Math.round(progress))),
+      currentStep,
+      error: error === null ? undefined : (error ?? job.error),
+    });
+    writeJob(updated);
+    return updated;
   });
-  writeJob(updated);
-  return updated;
 }
 
 export function markJobFailed(
@@ -191,22 +202,24 @@ export function markJobFailed(
   error: string,
   expectedWorkerId?: string,
 ): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job) {
-    return undefined;
-  }
-  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
-    return undefined;
-  }
+  return withJobLock(jobId, () => {
+    const job = readJob(jobId);
+    if (!job) {
+      return undefined;
+    }
+    if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
+      return undefined;
+    }
 
-  const updated = refreshTimestamps({
-    ...job,
-    status: "FAILED",
-    error,
-    currentStep: "Job failed",
+    const updated = refreshTimestamps({
+      ...job,
+      status: "FAILED",
+      error,
+      currentStep: "Job failed",
+    });
+    writeJob(updated);
+    return updated;
   });
-  writeJob(updated);
-  return updated;
 }
 
 export function completeJob(
@@ -214,55 +227,61 @@ export function completeJob(
   result: JobResult,
   expectedWorkerId?: string,
 ): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job) {
-    return undefined;
-  }
-  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
-    return undefined;
-  }
+  return withJobLock(jobId, () => {
+    const job = readJob(jobId);
+    if (!job) {
+      return undefined;
+    }
+    if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
+      return undefined;
+    }
 
-  const updated = refreshTimestamps({
-    ...job,
-    status: "COMPLETED",
-    progress: 100,
-    currentStep: "Complete",
-    result,
-    error: undefined,
+    const updated = refreshTimestamps({
+      ...job,
+      status: "COMPLETED",
+      progress: 100,
+      currentStep: "Complete",
+      result,
+      error: undefined,
+    });
+    writeJob(updated);
+    return updated;
   });
-  writeJob(updated);
-  return updated;
 }
 
 export function incrementJobAttempts(jobId: string): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job) {
-    return undefined;
-  }
+  return withJobLock(jobId, () => {
+    const job = readJob(jobId);
+    if (!job) {
+      return undefined;
+    }
 
-  const updated = refreshTimestamps({
-    ...job,
-    attempts: job.attempts + 1,
+    const updated = refreshTimestamps({
+      ...job,
+      attempts: job.attempts + 1,
+    });
+    writeJob(updated);
+    return updated;
   });
-  writeJob(updated);
-  return updated;
 }
 
 export function incrementJobAttemptsForWorker(
   jobId: string,
   workerId: string,
 ): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job || job.workerId !== workerId) {
-    return undefined;
-  }
+  return withJobLock(jobId, () => {
+    const job = readJob(jobId);
+    if (!job || job.workerId !== workerId) {
+      return undefined;
+    }
 
-  const updated = refreshTimestamps({
-    ...job,
-    attempts: job.attempts + 1,
+    const updated = refreshTimestamps({
+      ...job,
+      attempts: job.attempts + 1,
+    });
+    writeJob(updated);
+    return updated;
   });
-  writeJob(updated);
-  return updated;
 }
 
 export function cleanupExpiredJobs(): void {
