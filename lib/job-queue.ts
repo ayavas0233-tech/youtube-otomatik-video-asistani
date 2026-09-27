@@ -101,7 +101,12 @@ function readJob(jobId: string): JobRecord | undefined {
   }
 
   const raw = fs.readFileSync(filePath, "utf8");
-  return fromStored(JSON.parse(raw));
+  const job = fromStored(JSON.parse(raw));
+  if (job.expiresAt.getTime() <= Date.now()) {
+    fs.rmSync(filePath, { force: true });
+    return undefined;
+  }
+  return job;
 }
 
 function listAllJobs(): JobRecord[] {

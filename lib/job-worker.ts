@@ -168,7 +168,6 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       const errorMessage = toErrorMessage(error);
       const retryState = await incrementJobAttemptsForWorker(jobId, workerId);
       if (!retryState) {
-        await markJobFailed(jobId, "Job state update lock timeout.", workerId);
         return;
       }
 
