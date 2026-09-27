@@ -3,12 +3,13 @@ import { promises as fs } from "fs";
 import path from "path";
 
 import { generateImage, saveGeneratedImage } from "@/lib/images";
+import { type JobPayload, validateJobPayload } from "@/lib/job-payload";
 import { validateVideoPipelineConfig, validateYouTubeConfig } from "@/lib/config";
 import { generateScript } from "@/lib/openai";
 import { splitIntoScenes } from "@/lib/scenes";
 import { createSrt } from "@/lib/subtitles";
 import { generateSpeech, resolveTtsVoice } from "@/lib/tts";
-import { burnSubtitles, concatVideos, createThumbnail, renderScene } from "@/lib/video-render";
+import { burnSubtitles, concatVideos, createThumbnail, getAudioDuration, renderScene } from "@/lib/video-render";
 import { uploadYouTubeVideo } from "@/lib/youtube";
 
 const outputRoot = path.join(process.cwd(), process.env.UPLOAD_DIR || "tmp/video-jobs");
@@ -16,38 +17,20 @@ const outputRoot = path.join(process.cwd(), process.env.UPLOAD_DIR || "tmp/video
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type JobPayload = {
-  title?: string;
-  topic?: string;
-  audience?: string;
-  tone?: string;
-  duration?: string;
-  voice?: string;
-  uploadToYouTube?: boolean;
-  privacyStatus?: "private" | "public" | "unlisted";
-};
-
 type JobStatus = {
   jobId: string;
   status: "running" | "completed" | "failed";
   stage: string;
   updatedAt: string;
   message?: string;
+  videoPath?: string;
+  subtitlePath?: string;
+  thumbnailPath?: string;
+  youtube?: { videoId: string; url: string } | null;
 };
 
 async function writeJobStatus(jobDir: string, status: JobStatus): Promise<void> {
   await fs.writeFile(path.join(jobDir, "job-status.json"), JSON.stringify(status, null, 2), "utf8");
-}
-
-function validatePayload(payload: JobPayload): string | null {
-  if (payload.title !== undefined && typeof payload.title !== "string") return "title geçersiz";
-  if (payload.topic !== undefined && typeof payload.topic !== "string") return "topic geçersiz";
-  if (payload.uploadToYouTube !== undefined && typeof payload.uploadToYouTube !== "boolean") return "uploadToYouTube geçersiz";
-  if (payload.privacyStatus && !["private", "public", "unlisted"].includes(payload.privacyStatus)) {
-    return "privacyStatus geçersiz";
-  }
-
-  return null;
 }
 
 export async function POST(request: Request) {
@@ -56,7 +39,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json()) as JobPayload;
-    const validationError = validatePayload(payload);
+    const validationError = validateJobPayload(payload);
 
     if (validationError) {
       return Response.json({ ok: false, jobId, message: validationError }, { status: 400 });
@@ -83,6 +66,20 @@ export async function POST(request: Request) {
     const voice = payload.voice || "Neutral Narrator";
     const uploadToYouTube = payload.uploadToYouTube === true;
     const privacyStatus = payload.privacyStatus || "private";
+
+    if (uploadToYouTube) {
+      const youtubeConfig = validateYouTubeConfig();
+      if (!youtubeConfig.ok) {
+        return Response.json(
+          {
+            ok: false,
+            jobId,
+            message: `YouTube env eksik: ${youtubeConfig.missing.join(", ")}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     await fs.mkdir(jobDir, { recursive: true });
     const scenesDir = path.join(jobDir, "scenes");
@@ -148,13 +145,15 @@ export async function POST(request: Request) {
 
       const audioPath = path.join(sceneDir, "voice.mp3");
       await fs.writeFile(audioPath, audioBuffer);
+      const audioDuration = await getAudioDuration(audioPath);
+      const sceneDuration = Math.max(scene.duration, Math.ceil(audioDuration));
 
       const sceneVideo = path.join(sceneDir, "scene.mp4");
       await renderScene(
         {
           imagePath,
           audioPath,
-          duration: scene.duration,
+          duration: sceneDuration,
           preset: (process.env.FFMPEG_PRESET as "veryfast" | "fast" | "medium") || "veryfast",
           resolution: (process.env.VIDEO_RESOLUTION as "1280x720" | "1920x1080") || "1920x1080",
           audioBitrate: process.env.AUDIO_BITRATE || "192k",
@@ -167,11 +166,11 @@ export async function POST(request: Request) {
 
       subtitleItems.push({
         start: timeline,
-        end: timeline + scene.duration,
+        end: timeline + sceneDuration,
         text: scene.narration,
       });
 
-      timeline += scene.duration;
+      timeline += sceneDuration;
     }
 
     await writeJobStatus(jobDir, {
@@ -205,11 +204,6 @@ export async function POST(request: Request) {
     let youtubeResult: { videoId: string; url: string } | null = null;
 
     if (uploadToYouTube) {
-      const youtubeConfig = validateYouTubeConfig();
-      if (!youtubeConfig.ok) {
-        throw new Error(`YouTube env eksik: ${youtubeConfig.missing.join(", ")}`);
-      }
-
       await writeJobStatus(jobDir, {
         jobId,
         status: "running",
@@ -252,6 +246,10 @@ export async function POST(request: Request) {
       stage: "done",
       updatedAt: new Date().toISOString(),
       message: "Video üretimi tamamlandı",
+      videoPath: finalVideo,
+      subtitlePath,
+      thumbnailPath,
+      youtube: youtubeResult,
     });
 
     return Response.json(result);

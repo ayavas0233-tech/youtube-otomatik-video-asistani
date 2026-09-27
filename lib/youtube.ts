@@ -69,34 +69,32 @@ export async function uploadYouTubeVideo(params: UploadParams): Promise<UploadRe
 
   const stat = fs.statSync(params.filePath);
 
-  const insertResponse = await withRetry(async () => {
-    return youtube.videos.insert(
-      {
-        part: ["snippet", "status"],
-        requestBody: {
-          snippet: {
-            title: params.title,
-            description: params.description,
-            tags: params.tags,
-            categoryId: "27",
-          },
-          status: {
-            privacyStatus: params.privacyStatus || "private",
-            selfDeclaredMadeForKids: false,
-          },
+  const insertResponse = await youtube.videos.insert(
+    {
+      part: ["snippet", "status"],
+      requestBody: {
+        snippet: {
+          title: params.title,
+          description: params.description,
+          tags: params.tags,
+          categoryId: "27",
         },
-        media: {
-          body: fs.createReadStream(params.filePath),
+        status: {
+          privacyStatus: params.privacyStatus || "private",
+          selfDeclaredMadeForKids: false,
         },
       },
-      {
-        onUploadProgress: (event) => {
-          const uploaded = event.bytesRead || 0;
-          params.onProgress?.(uploaded, stat.size);
-        },
+      media: {
+        body: fs.createReadStream(params.filePath),
       },
-    );
-  });
+    },
+    {
+      onUploadProgress: (event) => {
+        const uploaded = event.bytesRead || 0;
+        params.onProgress?.(uploaded, stat.size);
+      },
+    },
+  );
 
   const videoId = insertResponse.data.id;
 

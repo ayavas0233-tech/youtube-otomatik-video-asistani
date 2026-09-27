@@ -9,7 +9,17 @@ export function validateRequiredEnv(keys: string[]): ConfigValidationResult {
 }
 
 export function validateVideoPipelineConfig(): ConfigValidationResult {
-  return validateRequiredEnv(["OPENAI_API_KEY"]);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim());
+  const hasElevenLabs = Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim());
+
+  if (hasOpenAI || hasElevenLabs) {
+    return { ok: true, missing: [] };
+  }
+
+  return {
+    ok: false,
+    missing: ["OPENAI_API_KEY or ELEVENLABS_API_KEY"],
+  };
 }
 
 export function validateYouTubeConfig(): ConfigValidationResult {

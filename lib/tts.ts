@@ -13,7 +13,11 @@ const elevenLabsVoiceMap: Record<string, string> = {
 };
 
 export function resolveTtsVoice(voiceName = "Neutral Narrator"): string {
-  return elevenLabsVoiceMap[voiceName] || openAiVoiceMap[voiceName] || "alloy";
+  return openAiVoiceMap[voiceName] || "alloy";
+}
+
+function resolveElevenLabsVoice(voiceName = "Neutral Narrator"): string | undefined {
+  return elevenLabsVoiceMap[voiceName] || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
 }
 
 async function generateWithElevenLabs(text: string, voiceName: string): Promise<Buffer> {
@@ -23,7 +27,7 @@ async function generateWithElevenLabs(text: string, voiceName: string): Promise<
     throw new Error("ELEVENLABS_API_KEY tanımlı değil.");
   }
 
-  const voiceId = elevenLabsVoiceMap[voiceName] || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
+  const voiceId = resolveElevenLabsVoice(voiceName);
 
   if (!voiceId) {
     throw new Error(`ElevenLabs voice bulunamadı: ${voiceName}`);

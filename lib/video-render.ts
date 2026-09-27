@@ -16,6 +16,10 @@ function getFfmpegPath(): string {
   return process.env.FFMPEG_PATH || "ffmpeg";
 }
 
+function getFfprobePath(): string {
+  return process.env.FFPROBE_PATH || "ffprobe";
+}
+
 function runFFmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(getFfmpegPath(), args);
@@ -34,6 +38,47 @@ function runFFmpeg(args: string[]): Promise<void> {
       } else {
         reject(new Error(`FFmpeg başarısız oldu (${code}): ${stderr.slice(-3000)}`));
       }
+    });
+  });
+}
+
+export function getAudioDuration(audioPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(getFfprobePath(), [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      audioPath,
+    ]);
+
+    let output = "";
+    let stderr = "";
+
+    child.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+
+    child.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`FFprobe başarısız oldu (${code}): ${stderr.slice(-1000)}`));
+        return;
+      }
+
+      const parsed = Number.parseFloat(output.trim());
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        reject(new Error("Ses süresi okunamadı."));
+        return;
+      }
+
+      resolve(parsed);
     });
   });
 }

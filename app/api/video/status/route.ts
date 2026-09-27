@@ -17,6 +17,16 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!/^[0-9a-fA-F-]{36}$/.test(jobId)) {
+    return Response.json(
+      {
+        ok: false,
+        message: "Geçersiz jobId formatı.",
+      },
+      { status: 400 },
+    );
+  }
+
   const statusPath = path.join(outputRoot, jobId, "job-status.json");
 
   try {
