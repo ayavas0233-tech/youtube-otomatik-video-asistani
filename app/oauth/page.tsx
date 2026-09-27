@@ -1,34 +1,78 @@
-import { NextResponse } from "next/server";
-import { google } from "googleapis";
+"use client";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get("code");
+import { useEffect, useState } from "react";
 
-  if (!code) {
-    return NextResponse.redirect(new URL("/oauth?error=missing_code", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
-  }
+export default function OAuthPage() {
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/youtube/oauth-callback";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const errorParam = params.get("error");
 
-  if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/oauth?error=missing_env", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
-  }
+    if (status === "success") {
+      setSuccess(true);
+      setLoading(false);
+      return;
+    }
 
-  try {
-    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-    const { tokens } = await oauth2Client.getToken(code);
+    if (errorParam) {
+      setError(`OAuth error: ${errorParam}`);
+      setLoading(false);
+      return;
+    }
 
-    const responseUrl = new URL("/oauth", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
-    responseUrl.searchParams.set("status", "success");
-    responseUrl.searchParams.set("access_token", tokens.access_token || "");
-    responseUrl.searchParams.set("refresh_token", tokens.refresh_token || "");
+    async function loadAuthUrl() {
+      try {
+        const response = await fetch("/api/youtube/auth-url");
+        const data = await response.json();
 
-    return NextResponse.redirect(responseUrl);
-  } catch (error) {
-    console.error("OAuth callback tokenization failed", error);
-    return NextResponse.redirect(new URL("/oauth?error=token_exchange_failed", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
-  }
+        if (!response.ok || !data.ok || !data.authUrl) {
+          throw new Error(data.message || "Could not prepare Google OAuth URL.");
+        }
+
+        setAuthUrl(data.authUrl);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "OAuth setup failed.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAuthUrl();
+  }, []);
+
+  return (
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 600, border: "1px solid #ddd", borderRadius: 12, padding: 24 }}>
+        <h1>YouTube OAuth</h1>
+        <p>Google hesabınız ile bağlanıp güvenli şekilde refresh token kaydı yapın.</p>
+
+        {loading ? <p>Yükleniyor...</p> : null}
+        {success ? <p role="status" aria-live="polite" style={{ color: "green" }}>OAuth başarılı, kanal doğrulaması yapılabilir.</p> : null}
+        {error ? <p role="alert" style={{ color: "crimson" }}>{error}</p> : null}
+
+        {!loading && !success && !error && authUrl ? (
+          <a
+            href={authUrl}
+            className="oauth-link"
+            style={{
+              display: "inline-block",
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#2563eb",
+              color: "#fff",
+              textDecoration: "none",
+              outlineOffset: 2,
+            }}
+          >
+            YouTube ile Bağlan
+          </a>
+        ) : null}
+      </div>
+    </main>
+  );
 }
