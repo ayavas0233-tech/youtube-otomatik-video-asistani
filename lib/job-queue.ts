@@ -29,7 +29,10 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-async function withJobLock<T>(jobId: string, operation: () => T): Promise<T | undefined> {
+async function withJobLock<T>(
+  jobId: string,
+  operation: () => Promise<T> | T,
+): Promise<T | undefined> {
   const lockPath = jobLockPath(jobId);
   let lockHandle: fs.promises.FileHandle | undefined;
   const lockStart = Date.now();
@@ -49,7 +52,7 @@ async function withJobLock<T>(jobId: string, operation: () => T): Promise<T | un
   }
 
   try {
-    return operation();
+    return await operation();
   } finally {
     await lockHandle.close();
     await fs.promises.rm(lockPath, { force: true });
@@ -281,10 +284,15 @@ export function cleanupExpiredJobs(): void {
   const now = Date.now();
   for (const job of listAllJobs()) {
     if (job.expiresAt.getTime() <= now) {
-      const filePath = jobPath(job.jobId);
-      if (fs.existsSync(filePath)) {
-        fs.rmSync(filePath);
-      }
+      void withJobLock(job.jobId, async () => {
+        const latest = readJob(job.jobId);
+        if (!latest || latest.expiresAt.getTime() <= now) {
+          const filePath = jobPath(job.jobId);
+          if (fs.existsSync(filePath)) {
+            fs.rmSync(filePath);
+          }
+        }
+      });
     }
   }
 }
