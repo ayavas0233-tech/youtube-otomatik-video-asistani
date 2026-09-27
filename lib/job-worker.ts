@@ -15,6 +15,8 @@ import { splitIntoScenes } from "@/lib/scenes";
 
 const OUTPUT_ROOT = path.join(process.cwd(), "tmp", "jobs");
 
+class NonRetryableJobError extends Error {}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -131,7 +133,9 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
 
         const mockBaseUrl = process.env.YOUTUBE_MOCK_BASE_URL;
         if (!mockBaseUrl) {
-          throw new Error("YouTube upload requested but YOUTUBE_MOCK_BASE_URL is not configured.");
+          throw new NonRetryableJobError(
+            "YouTube upload requested but YOUTUBE_MOCK_BASE_URL is not configured.",
+          );
         }
 
         const videoId = `${job.payload.privacyStatus || "private"}-${jobId.slice(0, 12)}`;
@@ -171,7 +175,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         return;
       }
 
-      const nonRetryableError = errorMessage.includes("not configured");
+      const nonRetryableError = error instanceof NonRetryableJobError;
       if (retryState.attempts <= retryState.maxAttempts && !nonRetryableError) {
         await updateJobProgress(
           jobId,

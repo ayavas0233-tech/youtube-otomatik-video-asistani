@@ -2,9 +2,9 @@ import { getJob } from "@/lib/job-queue";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ jobId: string }> },
+  { params }: { params: { jobId: string } },
 ) {
-  const { jobId } = await params;
+  const { jobId } = params;
   const job = getJob(jobId);
 
   if (!job) {
