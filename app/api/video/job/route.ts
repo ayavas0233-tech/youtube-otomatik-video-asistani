@@ -198,7 +198,8 @@ export async function POST(request: Request) {
       title: `${title} | ${topic}`,
       description: `Bu videoda ${topic} konusu anlatılmaktadır.\n\nVideo otomatik olarak AI senaryo, seslendirme, görsel üretimi, FFmpeg ve altyazı sistemi kullanılarak oluşturuldu.`,
       tags: ["ai", "youtube", "yapayzeka", "otomasyon", "video", topic.toLowerCase()],
-      voice: resolveTtsVoice(voice),
+      voice,
+      resolvedVoice: resolveTtsVoice(voice),
     };
 
     let youtubeResult: { videoId: string; url: string } | null = null;

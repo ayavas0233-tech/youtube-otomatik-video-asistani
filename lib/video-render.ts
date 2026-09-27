@@ -91,7 +91,10 @@ export async function concatVideos(videoPaths: string[], outputPath: string): Pr
 }
 
 export async function burnSubtitles(videoPath: string, subtitlePath: string, outputPath: string): Promise<void> {
-  const escapedSubtitlePath = subtitlePath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+  const escapedSubtitlePath = subtitlePath
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'");
 
   await runFFmpeg([
     "-y",

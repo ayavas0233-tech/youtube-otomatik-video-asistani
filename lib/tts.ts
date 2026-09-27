@@ -70,10 +70,6 @@ async function generateWithOpenAI(text: string, voiceName: string, speed: number
   return Buffer.from(await response.arrayBuffer());
 }
 
-function fallbackSilentMp3(): Buffer {
-  return Buffer.alloc(0);
-}
-
 export async function generateSpeech({
   text,
   voice = "Neutral Narrator",
@@ -101,11 +97,6 @@ export async function generateSpeech({
     return await generateWithOpenAI(text, voice, safeSpeed);
   } catch (error) {
     console.error("OpenAI TTS failed:", error);
-
-    if (process.env.TTS_ALLOW_EMPTY_FALLBACK === "true") {
-      return fallbackSilentMp3();
-    }
-
     throw error;
   }
 }
