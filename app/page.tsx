@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const initialForm = {
   title: "Yapay Zeka ile Kâr Edin",
@@ -32,7 +32,9 @@ export default function Home() {
   const [form, setForm] = useState(initialForm);
   const [demoMode, setDemoMode] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [playingTts, setPlayingTts] = useState(false);
   const [script, setScript] = useState<string[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const summary = useMemo(() => {
     return {
@@ -41,12 +43,22 @@ export default function Home() {
     };
   }, [form]);
 
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      }
+    };
+  }, []);
+
   const handleChange = (field: keyof typeof initialForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleGenerateScript = async () => {
     setLoading(true);
+    setPlayingTts(false);
 
     try {
       const response = await fetch("/api/script", {
@@ -73,6 +85,48 @@ export default function Home() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePlayAudio = async () => {
+    if (!script.length) {
+      return;
+    }
+
+    try {
+      const text = script.join(" ");
+
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voice: form.voice,
+          speed: 1,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("TTS üretilemedi.");
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.onended = () => setPlayingTts(false);
+      audio.onerror = () => setPlayingTts(false);
+      audio.play();
+      setPlayingTts(true);
+    } catch (error) {
+      console.error(error);
+      setPlayingTts(false);
+      alert("TTS üretimi sırasında hata oluştu.");
     }
   };
 
@@ -204,7 +258,9 @@ export default function Home() {
               <button className="primary-button" onClick={handleGenerateScript} disabled={loading}>
                 {loading ? "Üretiliyor..." : "Önizleme oluştur"}
               </button>
-              <button className="secondary-button">Taslağı kaydet</button>
+              <button className="secondary-button" onClick={handlePlayAudio} disabled={!script.length || playingTts}>
+                {playingTts ? "Ses çalınıyor..." : "Senaryoyu seslendir"}
+              </button>
             </div>
 
             <div className="script-output" style={{ marginTop: 20 }}>
