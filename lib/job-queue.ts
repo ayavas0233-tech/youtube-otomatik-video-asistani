@@ -7,58 +7,71 @@ import { JobRecord, JobResult, JobStatus, VideoJobPayload } from "@/lib/job-type
 const RETENTION_HOURS = 24;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
 const RETENTION_MS = RETENTION_HOURS * 60 * 60 * 1000;
-const STORE_FILE_PATH = path.join(process.cwd(), "tmp", "video-jobs-store.json");
+const STORE_DIR = path.join(process.cwd(), "tmp", "video-jobs-store");
 
-const jobs = new Map<string, JobRecord>();
-
-function ensureStoreFile(): void {
-  const storeDir = path.dirname(STORE_FILE_PATH);
-  if (!fs.existsSync(storeDir)) {
-    fs.mkdirSync(storeDir, { recursive: true });
-  }
-  if (!fs.existsSync(STORE_FILE_PATH)) {
-    fs.writeFileSync(STORE_FILE_PATH, JSON.stringify([]));
+function ensureStoreDir(): void {
+  if (!fs.existsSync(STORE_DIR)) {
+    fs.mkdirSync(STORE_DIR, { recursive: true });
   }
 }
 
-function hydrateJobsFromStore(): void {
-  ensureStoreFile();
-  try {
-    const raw = fs.readFileSync(STORE_FILE_PATH, "utf8");
-    const records = JSON.parse(raw) as Array<
-      Omit<JobRecord, "createdAt" | "updatedAt" | "expiresAt"> & {
-        createdAt: string;
-        updatedAt: string;
-        expiresAt: string;
-      }
-    >;
-    jobs.clear();
-    for (const record of records) {
-      jobs.set(record.jobId, {
-        ...record,
-        createdAt: new Date(record.createdAt),
-        updatedAt: new Date(record.updatedAt),
-        expiresAt: new Date(record.expiresAt),
-      });
-    }
-  } catch {
-    jobs.clear();
-  }
-}
-
-function persistJobsToStore(): void {
-  ensureStoreFile();
-  const payload = Array.from(jobs.values()).map((job) => ({
-    ...job,
-    createdAt: job.createdAt.toISOString(),
-    updatedAt: job.updatedAt.toISOString(),
-    expiresAt: job.expiresAt.toISOString(),
-  }));
-  fs.writeFileSync(STORE_FILE_PATH, JSON.stringify(payload));
+function jobPath(jobId: string): string {
+  return path.join(STORE_DIR, `${jobId}.json`);
 }
 
 function nextExpiryDate(): Date {
   return new Date(Date.now() + RETENTION_MS);
+}
+
+function toStored(job: JobRecord) {
+  return {
+    ...job,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
+    expiresAt: job.expiresAt.toISOString(),
+  };
+}
+
+function fromStored(
+  job: Omit<JobRecord, "createdAt" | "updatedAt" | "expiresAt"> & {
+    createdAt: string;
+    updatedAt: string;
+    expiresAt: string;
+  },
+): JobRecord {
+  return {
+    ...job,
+    createdAt: new Date(job.createdAt),
+    updatedAt: new Date(job.updatedAt),
+    expiresAt: new Date(job.expiresAt),
+  };
+}
+
+function writeJob(job: JobRecord): void {
+  ensureStoreDir();
+  fs.writeFileSync(jobPath(job.jobId), JSON.stringify(toStored(job)));
+}
+
+function readJob(jobId: string): JobRecord | undefined {
+  ensureStoreDir();
+  const filePath = jobPath(jobId);
+  if (!fs.existsSync(filePath)) {
+    return undefined;
+  }
+
+  const raw = fs.readFileSync(filePath, "utf8");
+  return fromStored(JSON.parse(raw));
+}
+
+function listAllJobs(): JobRecord[] {
+  ensureStoreDir();
+  return fs
+    .readdirSync(STORE_DIR)
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => {
+      const raw = fs.readFileSync(path.join(STORE_DIR, name), "utf8");
+      return fromStored(JSON.parse(raw));
+    });
 }
 
 function refreshTimestamps(job: JobRecord): JobRecord {
@@ -71,7 +84,6 @@ function refreshTimestamps(job: JobRecord): JobRecord {
 }
 
 export function createJob(payload: VideoJobPayload): JobRecord {
-  hydrateJobsFromStore();
   const now = new Date();
   const job: JobRecord = {
     jobId: randomUUID(),
@@ -85,28 +97,40 @@ export function createJob(payload: VideoJobPayload): JobRecord {
     updatedAt: now,
     expiresAt: nextExpiryDate(),
   };
-
-  jobs.set(job.jobId, job);
-  persistJobsToStore();
+  writeJob(job);
   return job;
 }
 
 export function getJob(jobId: string): JobRecord | undefined {
-  hydrateJobsFromStore();
-  return jobs.get(jobId);
+  return readJob(jobId);
 }
 
 export function listJobs(status?: JobStatus): JobRecord[] {
-  hydrateJobsFromStore();
-  const allJobs = Array.from(jobs.values()).sort(
+  const jobs = listAllJobs().sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
 
   if (!status) {
-    return allJobs;
+    return jobs;
   }
 
-  return allJobs.filter((job) => job.status === status);
+  return jobs.filter((job) => job.status === status);
+}
+
+export function claimJob(jobId: string, workerId: string): JobRecord | undefined {
+  const job = readJob(jobId);
+  if (!job || job.status !== "PENDING") {
+    return undefined;
+  }
+
+  const claimed = refreshTimestamps({
+    ...job,
+    status: "PROCESSING",
+    workerId,
+    currentStep: "Worker claimed job",
+  });
+  writeJob(claimed);
+  return claimed;
 }
 
 export function updateJobProgress(
@@ -115,8 +139,7 @@ export function updateJobProgress(
   currentStep: string,
   status: JobStatus = "PROCESSING",
 ): JobRecord | undefined {
-  hydrateJobsFromStore();
-  const job = jobs.get(jobId);
+  const job = readJob(jobId);
   if (!job) {
     return undefined;
   }
@@ -128,15 +151,12 @@ export function updateJobProgress(
     currentStep,
     error: status === "FAILED" ? job.error : undefined,
   });
-
-  jobs.set(jobId, updated);
-  persistJobsToStore();
+  writeJob(updated);
   return updated;
 }
 
 export function markJobFailed(jobId: string, error: string): JobRecord | undefined {
-  hydrateJobsFromStore();
-  const job = jobs.get(jobId);
+  const job = readJob(jobId);
   if (!job) {
     return undefined;
   }
@@ -147,14 +167,12 @@ export function markJobFailed(jobId: string, error: string): JobRecord | undefin
     error,
     currentStep: "Job failed",
   });
-  jobs.set(jobId, updated);
-  persistJobsToStore();
+  writeJob(updated);
   return updated;
 }
 
 export function completeJob(jobId: string, result: JobResult): JobRecord | undefined {
-  hydrateJobsFromStore();
-  const job = jobs.get(jobId);
+  const job = readJob(jobId);
   if (!job) {
     return undefined;
   }
@@ -167,14 +185,12 @@ export function completeJob(jobId: string, result: JobResult): JobRecord | undef
     result,
     error: undefined,
   });
-  jobs.set(jobId, updated);
-  persistJobsToStore();
+  writeJob(updated);
   return updated;
 }
 
 export function incrementJobAttempts(jobId: string): JobRecord | undefined {
-  hydrateJobsFromStore();
-  const job = jobs.get(jobId);
+  const job = readJob(jobId);
   if (!job) {
     return undefined;
   }
@@ -183,20 +199,21 @@ export function incrementJobAttempts(jobId: string): JobRecord | undefined {
     ...job,
     attempts: job.attempts + 1,
   });
-  jobs.set(jobId, updated);
-  persistJobsToStore();
+  writeJob(updated);
   return updated;
 }
 
 export function cleanupExpiredJobs(): void {
-  hydrateJobsFromStore();
+  ensureStoreDir();
   const now = Date.now();
-  for (const [jobId, job] of jobs.entries()) {
+  for (const job of listAllJobs()) {
     if (job.expiresAt.getTime() <= now) {
-      jobs.delete(jobId);
+      const filePath = jobPath(job.jobId);
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath);
+      }
     }
   }
-  persistJobsToStore();
 }
 
 const cleanupState = globalThis as typeof globalThis & {

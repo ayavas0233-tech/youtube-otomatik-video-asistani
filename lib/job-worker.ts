@@ -1,7 +1,9 @@
+import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 
 import {
+  claimJob,
   completeJob,
   getJob,
   incrementJobAttempts,
@@ -12,8 +14,6 @@ import { generateScript } from "@/lib/openai";
 import { splitIntoScenes } from "@/lib/scenes";
 
 const OUTPUT_ROOT = path.join(process.cwd(), "tmp", "jobs");
-
-const runningJobs = new Set<string>();
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -37,21 +37,15 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function startJobWorker(jobId: string): void {
-  if (runningJobs.has(jobId)) {
-    return;
-  }
-
-  runningJobs.add(jobId);
+  const workerId = randomUUID();
   setTimeout(() => {
-    void processJob(jobId).finally(() => {
-      runningJobs.delete(jobId);
-    });
+    void processJob(jobId, workerId);
   }, 0);
 }
 
-async function processJob(jobId: string): Promise<void> {
-  const initialJob = getJob(jobId);
-  if (!initialJob) {
+async function processJob(jobId: string, workerId: string): Promise<void> {
+  const claimedJob = claimJob(jobId, workerId);
+  if (!claimedJob) {
     return;
   }
 
@@ -156,7 +150,7 @@ async function processJob(jobId: string): Promise<void> {
           jobId,
           current.progress,
           `Retrying (${current.attempts}/${current.maxAttempts})`,
-          "PENDING",
+          "PROCESSING",
         );
         continue;
       }

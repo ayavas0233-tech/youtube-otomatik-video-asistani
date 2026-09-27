@@ -30,6 +30,7 @@ export type JobRecord = {
   status: JobStatus;
   progress: number;
   currentStep: string;
+  workerId?: string;
   payload: VideoJobPayload;
   result?: JobResult;
   error?: string;

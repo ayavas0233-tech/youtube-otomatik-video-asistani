@@ -2,13 +2,14 @@ import { getJob } from "@/lib/job-queue";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { jobId: string } },
+  { params }: { params: Promise<{ jobId: string }> },
 ) {
-  const job = getJob(params.jobId);
+  const { jobId } = await params;
+  const job = getJob(jobId);
 
   if (!job) {
     return Response.json(
-      { ok: false, message: "Job not found", jobId: params.jobId },
+      { ok: false, message: "Job not found", jobId },
       { status: 404 },
     );
   }
