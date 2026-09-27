@@ -29,6 +29,22 @@ type JobStatus = {
   youtube?: { videoId: string; url: string } | null;
 };
 
+function resolvePreset(): "veryfast" | "fast" | "medium" {
+  const value = process.env.FFMPEG_PRESET;
+  if (value === "veryfast" || value === "fast" || value === "medium") {
+    return value;
+  }
+  return "veryfast";
+}
+
+function resolveResolution(): "1280x720" | "1920x1080" {
+  const value = process.env.VIDEO_RESOLUTION;
+  if (value === "1280x720" || value === "1920x1080") {
+    return value;
+  }
+  return "1920x1080";
+}
+
 async function writeJobStatus(jobDir: string, status: JobStatus): Promise<void> {
   await fs.writeFile(path.join(jobDir, "job-status.json"), JSON.stringify(status, null, 2), "utf8");
 }
@@ -148,8 +164,8 @@ export async function POST(request: Request) {
           imagePath,
           audioPath,
           duration: sceneDuration,
-          preset: (process.env.FFMPEG_PRESET as "veryfast" | "fast" | "medium") || "veryfast",
-          resolution: (process.env.VIDEO_RESOLUTION as "1280x720" | "1920x1080") || "1920x1080",
+          preset: resolvePreset(),
+          resolution: resolveResolution(),
           audioBitrate: process.env.AUDIO_BITRATE || "192k",
           videoBitrate: process.env.VIDEO_BITRATE || "3500k",
         },

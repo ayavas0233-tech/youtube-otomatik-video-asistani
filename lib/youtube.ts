@@ -72,9 +72,13 @@ export async function uploadYouTubeVideo(params: UploadParams): Promise<UploadRe
 
   const youtube = google.youtube({ version: "v3", auth });
 
-  await withRetry(async () => {
-    await youtube.channels.list({ part: ["id"], mine: true });
+  const channelResponse = await withRetry(async () => {
+    return youtube.channels.list({ part: ["id"], mine: true });
   });
+
+  if (!channelResponse.data.items?.length) {
+    throw new Error("YouTube kanal erişimi doğrulanamadı.");
+  }
 
   const stat = fs.statSync(params.filePath);
 

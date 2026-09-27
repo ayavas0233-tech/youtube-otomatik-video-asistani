@@ -9,6 +9,7 @@ export type GeneratedImage = {
 };
 
 type ImageSize = "1024x1024" | "1280x720";
+type OpenAiImageSize = "1024x1024" | "1792x1024";
 
 function createPlaceholderBase64(prompt: string, size: ImageSize): string {
   const [width, height] = size.split("x");
@@ -39,7 +40,7 @@ export async function generateImage({
   }
 
   try {
-    const modelSize = size === "1280x720" ? "1792x1024" : size;
+    const modelSize: OpenAiImageSize = size === "1280x720" ? "1792x1024" : "1024x1024";
     const response = await openai.images.generate({
       model: "gpt-image-1",
       prompt: trimmed,
