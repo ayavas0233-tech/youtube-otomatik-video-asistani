@@ -164,10 +164,14 @@ export function updateJobProgress(
   progress: number,
   currentStep: string,
   status: JobStatus = "PROCESSING",
-  error?: string,
+  error?: string | null,
+  expectedWorkerId?: string,
 ): JobRecord | undefined {
   const job = readJob(jobId);
   if (!job) {
+    return undefined;
+  }
+  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
     return undefined;
   }
 
@@ -176,15 +180,22 @@ export function updateJobProgress(
     status,
     progress: Math.max(0, Math.min(100, Math.round(progress))),
     currentStep,
-    error: error || job.error,
+    error: error === null ? undefined : (error ?? job.error),
   });
   writeJob(updated);
   return updated;
 }
 
-export function markJobFailed(jobId: string, error: string): JobRecord | undefined {
+export function markJobFailed(
+  jobId: string,
+  error: string,
+  expectedWorkerId?: string,
+): JobRecord | undefined {
   const job = readJob(jobId);
   if (!job) {
+    return undefined;
+  }
+  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
     return undefined;
   }
 
@@ -198,9 +209,16 @@ export function markJobFailed(jobId: string, error: string): JobRecord | undefin
   return updated;
 }
 
-export function completeJob(jobId: string, result: JobResult): JobRecord | undefined {
+export function completeJob(
+  jobId: string,
+  result: JobResult,
+  expectedWorkerId?: string,
+): JobRecord | undefined {
   const job = readJob(jobId);
   if (!job) {
+    return undefined;
+  }
+  if (expectedWorkerId && job.workerId && job.workerId !== expectedWorkerId) {
     return undefined;
   }
 
@@ -219,6 +237,23 @@ export function completeJob(jobId: string, result: JobResult): JobRecord | undef
 export function incrementJobAttempts(jobId: string): JobRecord | undefined {
   const job = readJob(jobId);
   if (!job) {
+    return undefined;
+  }
+
+  const updated = refreshTimestamps({
+    ...job,
+    attempts: job.attempts + 1,
+  });
+  writeJob(updated);
+  return updated;
+}
+
+export function incrementJobAttemptsForWorker(
+  jobId: string,
+  workerId: string,
+): JobRecord | undefined {
+  const job = readJob(jobId);
+  if (!job || job.workerId !== workerId) {
     return undefined;
   }
 
