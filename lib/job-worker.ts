@@ -21,19 +21,6 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-function buildYoutubeResult(
-  jobId: string,
-  privacyStatus: "private" | "public" | "unlisted" = "private",
-) {
-  const privacyPrefix =
-    privacyStatus === "public" ? "pub" : privacyStatus === "unlisted" ? "unl" : "prv";
-  const videoId = `${privacyPrefix}-${jobId.slice(0, 12)}`;
-  return {
-    videoId,
-    url: `https://www.youtube.com/watch?v=${videoId}`,
-  };
-}
-
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -109,6 +96,9 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       const videoPath = path.join(outputDir, "final.mp4");
       const thumbnailPath = path.join(outputDir, "thumbnail.jpg");
       const subtitlePath = path.join(outputDir, "subtitles.srt");
+      const publicVideoPath = `${jobId}/final.mp4`;
+      const publicThumbnailPath = `${jobId}/thumbnail.jpg`;
+      const publicSubtitlePath = `${jobId}/subtitles.srt`;
 
       await Promise.all([
         fs.writeFile(videoPath, "placeholder video output"),
@@ -132,13 +122,12 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         updateJobProgress(
           jobId,
           98,
-          `YouTube upload starting (${job.payload.privacyStatus || "private"})`,
+          `YouTube upload skipped (${job.payload.privacyStatus || "private"})`,
           "PROCESSING",
           undefined,
           workerId,
         );
         await wait(100);
-        youtube = buildYoutubeResult(jobId, job.payload.privacyStatus || "private");
       }
 
       completeJob(
@@ -147,9 +136,9 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
           title: job.payload.title || "Yapay Zeka ile Kâr Edin",
           topic: job.payload.topic,
           scenes: scenes.length,
-          videoPath,
-          thumbnailPath,
-          subtitlePath,
+          videoPath: publicVideoPath,
+          thumbnailPath: publicThumbnailPath,
+          subtitlePath: publicSubtitlePath,
           youtube,
           generatedAt: new Date().toISOString(),
         },

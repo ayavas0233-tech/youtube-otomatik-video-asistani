@@ -1,17 +1,10 @@
 import { getJob } from "@/lib/job-queue";
-import path from "path";
-
-function toArtifactId(filePath: string): string {
-  const normalized = path.normalize(filePath);
-  const segments = normalized.split(/[\\/]+/).filter(Boolean);
-  return segments.slice(-2).join("/");
-}
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ jobId: string }> },
+  { params }: { params: { jobId: string } },
 ) {
-  const { jobId } = await params;
+  const { jobId } = params;
   const job = getJob(jobId);
 
   if (!job) {
@@ -27,14 +20,7 @@ export async function GET(
     status: job.status,
     progress: job.progress,
     currentStep: job.currentStep,
-    result: job.result
-      ? {
-          ...job.result,
-          videoPath: toArtifactId(job.result.videoPath),
-          thumbnailPath: toArtifactId(job.result.thumbnailPath),
-          subtitlePath: toArtifactId(job.result.subtitlePath),
-        }
-      : undefined,
+    result: job.result,
     error: job.error,
   });
 }

@@ -25,17 +25,12 @@ function jobLockPath(jobId: string): string {
 
 function withJobLock<T>(jobId: string, operation: () => T): T | undefined {
   const lockPath = jobLockPath(jobId);
-  const lockStart = Date.now();
   let lockFd: number | undefined;
 
-  while (typeof lockFd !== "number") {
-    try {
-      lockFd = fs.openSync(lockPath, "wx");
-    } catch {
-      if (Date.now() - lockStart > 500) {
-        return undefined;
-      }
-    }
+  try {
+    lockFd = fs.openSync(lockPath, "wx");
+  } catch {
+    return undefined;
   }
 
   try {

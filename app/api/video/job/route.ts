@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const payload = await request.json();
     if (!isValidPayload(payload)) {
       return Response.json(
-        { ok: false, message: "Geçerli bir topic alanı zorunludur." },
+        { ok: false, message: "Geçerli bir topic ve privacyStatus değeri zorunludur." },
         { status: 400 },
       );
     }
