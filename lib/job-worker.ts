@@ -122,12 +122,23 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
         updateJobProgress(
           jobId,
           98,
-          `YouTube upload skipped (${job.payload.privacyStatus || "private"})`,
+          `YouTube upload starting (${job.payload.privacyStatus || "private"})`,
           "PROCESSING",
           undefined,
           workerId,
         );
         await wait(100);
+
+        const mockBaseUrl = process.env.YOUTUBE_MOCK_BASE_URL;
+        if (!mockBaseUrl) {
+          throw new Error("YouTube upload requested but YOUTUBE_MOCK_BASE_URL is not configured.");
+        }
+
+        const videoId = `${job.payload.privacyStatus || "private"}-${jobId.slice(0, 12)}`;
+        youtube = {
+          videoId,
+          url: `${mockBaseUrl.replace(/\/$/, "")}/${videoId}`,
+        };
       }
 
       completeJob(

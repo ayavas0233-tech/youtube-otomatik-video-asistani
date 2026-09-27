@@ -26,11 +26,18 @@ function jobLockPath(jobId: string): string {
 function withJobLock<T>(jobId: string, operation: () => T): T | undefined {
   const lockPath = jobLockPath(jobId);
   let lockFd: number | undefined;
+  const lockStart = Date.now();
+  const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
 
-  try {
-    lockFd = fs.openSync(lockPath, "wx");
-  } catch {
-    return undefined;
+  while (typeof lockFd !== "number") {
+    try {
+      lockFd = fs.openSync(lockPath, "wx");
+    } catch {
+      if (Date.now() - lockStart > 500) {
+        return undefined;
+      }
+      Atomics.wait(sleepBuffer, 0, 0, 10);
+    }
   }
 
   try {
