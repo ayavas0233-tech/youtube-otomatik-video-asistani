@@ -31,6 +31,8 @@ const statCards = [
 export default function Home() {
   const [form, setForm] = useState(initialForm);
   const [demoMode, setDemoMode] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [script, setScript] = useState<string[]>([]);
 
   const summary = useMemo(() => {
     return {
@@ -39,11 +41,39 @@ export default function Home() {
     };
   }, [form]);
 
-  const handleChange = (
-    field: keyof typeof initialForm,
-    value: string,
-  ) => {
+  const handleChange = (field: keyof typeof initialForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleGenerateScript = async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await response.json();
+
+      if (data.ok) {
+        setScript(data.script);
+      } else {
+        setScript([
+          "Giriş: İzleyici için çarpıcı bir açılış cümlesi hazırlandı.",
+          "Eksik veya başarısız üretim nedeniyle fallback metin kullanıldı.",
+        ]);
+      }
+    } catch (error) {
+      console.error(error);
+      setScript([
+        "Giriş: İzleyici için çarpıcı bir açılış cümlesi hazırlandı.",
+        "Üretim sırasında hata oluştu; yedek içerik gösteriliyor.",
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -104,7 +134,9 @@ export default function Home() {
             <h3>{summary.headline}</h3>
             <p>{summary.subtitle}</p>
           </div>
-          <button className="primary-button">Video üretimini başlat</button>
+          <button className="primary-button" onClick={handleGenerateScript} disabled={loading}>
+            {loading ? "Üretiliyor..." : "Video üretimini başlat"}
+          </button>
         </div>
 
         <div className="workspace-grid">
@@ -169,8 +201,22 @@ export default function Home() {
             </div>
 
             <div className="actions-row">
-              <button className="primary-button">Önizleme oluştur</button>
+              <button className="primary-button" onClick={handleGenerateScript} disabled={loading}>
+                {loading ? "Üretiliyor..." : "Önizleme oluştur"}
+              </button>
               <button className="secondary-button">Taslağı kaydet</button>
+            </div>
+
+            <div className="script-output" style={{ marginTop: 20 }}>
+              {script.length > 0 ? (
+                script.map((line, index) => (
+                  <p key={index} style={{ marginBottom: 8, lineHeight: 1.7 }}>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className="muted-text">Henüz senaryo üretilmedi.</p>
+              )}
             </div>
           </div>
 
