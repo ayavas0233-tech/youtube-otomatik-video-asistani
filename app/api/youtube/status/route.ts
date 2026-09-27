@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  const hasGoogleConfig = Boolean(
-    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI,
-  );
+import { getYouTubeChannelStatus } from "@/lib/youtube";
 
-  return NextResponse.json({
-    ok: hasGoogleConfig,
-    message: hasGoogleConfig ? "Google OAuth hazır." : "Google OAuth için env ayarları eksik.",
-  });
+export async function GET() {
+  try {
+    const status = await getYouTubeChannelStatus();
+    return NextResponse.json({ ok: status.ok, status });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : "YouTube durum kontrolü başarısız.",
+      },
+      { status: 500 },
+    );
+  }
 }

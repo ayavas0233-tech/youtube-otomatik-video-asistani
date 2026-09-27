@@ -1,40 +1,39 @@
 export type Scene = {
-  id: number;
-  title: string;
+  order: number;
   narration: string;
   visualPrompt: string;
   duration: number;
 };
 
-export function splitIntoScenes(script: string[]): Scene[] {
-  const cleaned = script
-    .map((line) => line.trim())
+export function splitIntoScenes(script: string | string[]): Scene[] {
+  const text = Array.isArray(script) ? script.join("\n") : script;
+
+  const blocks = text
+    .split(/\n\s*\n/g)
+    .flatMap((chunk) => chunk.split("\n"))
+    .map((line) => line.replace(/^[-*\d.)\s]+/, "").trim())
     .filter(Boolean);
 
-  if (!cleaned.length) {
+  if (!blocks.length) {
     return [];
   }
 
-  return cleaned.map((line, index) => ({
-    id: index + 1,
-    title: `Sahne ${index + 1}`,
-    narration: line,
-    visualPrompt: buildVisualPrompt(line),
-    duration: estimateDuration(line),
+  return blocks.map((narration, index) => ({
+    order: index + 1,
+    narration,
+    visualPrompt: buildVisualPrompt(narration),
+    duration: estimateDuration(narration),
   }));
 }
 
 function buildVisualPrompt(text: string): string {
-  const cleaned = text
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const base = `Cinematic modern YouTube thumbnail style, high detail, clear composition, vibrant colors, professional lighting, clean background, realistic visuals, marketing video aesthetic, ${cleaned}`;
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  const base = `Cinematic modern YouTube scene, high detail, realistic lighting, clean composition, 16:9 framing, ${cleaned}`;
 
   return base.slice(0, 900);
 }
 
 function estimateDuration(text: string): number {
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
-  return Math.max(3, Math.ceil(wordCount / 8));
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return Math.max(3, Math.ceil(words / 2.6));
 }
