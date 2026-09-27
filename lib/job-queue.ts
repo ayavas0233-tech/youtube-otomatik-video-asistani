@@ -19,6 +19,10 @@ function jobPath(jobId: string): string {
   return path.join(STORE_DIR, `${jobId}.json`);
 }
 
+function jobLockPath(jobId: string): string {
+  return path.join(STORE_DIR, `${jobId}.lock`);
+}
+
 function nextExpiryDate(): Date {
   return new Date(Date.now() + RETENTION_MS);
 }
@@ -68,9 +72,13 @@ function listAllJobs(): JobRecord[] {
   return fs
     .readdirSync(STORE_DIR)
     .filter((name) => name.endsWith(".json"))
-    .map((name) => {
-      const raw = fs.readFileSync(path.join(STORE_DIR, name), "utf8");
-      return fromStored(JSON.parse(raw));
+    .flatMap((name) => {
+      try {
+        const raw = fs.readFileSync(path.join(STORE_DIR, name), "utf8");
+        return [fromStored(JSON.parse(raw))];
+      } catch {
+        return [];
+      }
     });
 }
 
@@ -118,19 +126,37 @@ export function listJobs(status?: JobStatus): JobRecord[] {
 }
 
 export function claimJob(jobId: string, workerId: string): JobRecord | undefined {
-  const job = readJob(jobId);
-  if (!job || job.status !== "PENDING") {
+  const lockPath = jobLockPath(jobId);
+  let lockFd: number | undefined;
+
+  try {
+    lockFd = fs.openSync(lockPath, "wx");
+  } catch {
     return undefined;
   }
 
-  const claimed = refreshTimestamps({
-    ...job,
-    status: "PROCESSING",
-    workerId,
-    currentStep: "Worker claimed job",
-  });
-  writeJob(claimed);
-  return claimed;
+  try {
+    const job = readJob(jobId);
+    if (!job || job.status !== "PENDING") {
+      return undefined;
+    }
+
+    const claimed = refreshTimestamps({
+      ...job,
+      status: "PROCESSING",
+      workerId,
+      currentStep: "Worker claimed job",
+    });
+    writeJob(claimed);
+    return claimed;
+  } finally {
+    if (typeof lockFd === "number") {
+      fs.closeSync(lockFd);
+    }
+    if (fs.existsSync(lockPath)) {
+      fs.rmSync(lockPath);
+    }
+  }
 }
 
 export function updateJobProgress(
@@ -138,6 +164,7 @@ export function updateJobProgress(
   progress: number,
   currentStep: string,
   status: JobStatus = "PROCESSING",
+  error?: string,
 ): JobRecord | undefined {
   const job = readJob(jobId);
   if (!job) {
@@ -149,7 +176,7 @@ export function updateJobProgress(
     status,
     progress: Math.max(0, Math.min(100, Math.round(progress))),
     currentStep,
-    error: status === "FAILED" ? job.error : undefined,
+    error: error || job.error,
   });
   writeJob(updated);
   return updated;

@@ -151,6 +151,7 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
           current.progress,
           `Retrying (${current.attempts}/${current.maxAttempts})`,
           "PROCESSING",
+          errorMessage,
         );
         continue;
       }
