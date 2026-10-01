@@ -23,66 +23,29 @@ git clone https://github.com/ayavas0233-tech/youtube-otomatik-video-asistani.git
 cd youtube-otomatik-video-asistani
 ```
 
-### 2. Google Cloud Projesi Oluştur
-
-1. [Google Cloud Console](https://console.cloud.google.com) açın
-2. Yeni bir proje oluşturun
-3. **YouTube Data API v3**'ü etkinleştirin
-4. **OAuth 2.0 Consent Screen** yapılandırın
-5. **OAuth 2.0 Client Credentials** oluşturun (Web application)
-6. Redirect URI'yi ayarlayın:
-   ```
-   http://localhost:3000/api/youtube/oauth-callback
-   ```
-
-### 3. Bağımlılıkları Yükle
+### 2. Bağımlılıkları Yükle
 
 ```bash
 npm install
 ```
 
-### 4. Encryption Key Oluştur
+### 3. Ortam Değişkenlerini Yapılandır
 
-TOKEN_ENCRYPTION_KEY için 32 byte hex string gerekli:
+Örnek dosyayı kopyalayın:
+
+```bash
+cp .env.local.example .env.local
+```
+
+`.env.local` içindeki Google ve OpenAI değerlerini kendi anahtarlarınızla doldurun. `TOKEN_ENCRYPTION_KEY` için 32-byte hex anahtarı üretip ekleyin:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Çıktıyı not edin, sonra `.env.local`'a kopyalayacaksınız.
+Google Cloud, API anahtarları ve sorun giderme adımları için [SETUP.md](SETUP.md) dosyasına bakın. Gizli anahtar içeren `.env.local` dosyasını paylaşmayın veya commit etmeyin.
 
-### 5. Ortam Değişkenlerini Yapılandır
-
-`.env.local` dosyası oluşturun ve aşağıdaki içeriği yapıştırın:
-
-```env
-# OpenAI
-OPENAI_API_KEY=sk_...
-OPENAI_MODEL=gpt-4o-mini
-
-# TTS Provider (OpenAI veya ElevenLabs)
-ELEVENLABS_API_KEY=
-ELEVENLABS_MODEL_ID=eleven_multilingual_v2
-TTS_PROVIDER=elevenlabs
-
-# Google / YouTube OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/youtube/oauth-callback
-
-# Token Storage & Encryption
-TOKEN_STORAGE_PROVIDER=env
-TOKEN_ENCRYPTION_KEY=<Adım 4'te oluşturduğunuz key>
-
-# Video Processing
-FFMPEG_PATH=ffmpeg
-FFPROBE_PATH=ffprobe
-
-# Application
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-### 6. Uygulamayı Başlat
+### 4. Uygulamayı Başlat
 
 ```bash
 npm run dev
