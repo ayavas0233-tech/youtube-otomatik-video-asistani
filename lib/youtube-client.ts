@@ -3,6 +3,19 @@ import type { OAuth2Client } from "google-auth-library";
 
 import { hasStoredTokens, loadTokens, saveTokens, StoredYouTubeTokens } from "@/lib/youtube-token-store";
 
+/**
+ * Thrown when the server has no usable Google OAuth configuration or stored
+ * YouTube tokens. Callers (e.g. the job worker) can check for this via
+ * `instanceof` to treat the failure as non-retryable, since retrying the
+ * same job won't fix a missing/expired connection.
+ */
+export class YouTubeConnectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "YouTubeConnectionError";
+  }
+}
+
 const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube.readonly",
@@ -17,7 +30,9 @@ function getOAuthConfig(): { clientId: string; clientSecret: string; redirectUri
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/youtube/oauth-callback`;
 
   if (!clientId || !clientSecret) {
-    throw new Error("Google OAuth istemci bilgileri (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) eksik.");
+    throw new YouTubeConnectionError(
+      "Google OAuth istemci bilgileri (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) eksik.",
+    );
   }
 
   return { clientId, clientSecret, redirectUri };
@@ -27,6 +42,7 @@ export function createOAuthClient(): OAuth2Client {
   const { clientId, clientSecret, redirectUri } = getOAuthConfig();
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
+
 
 /**
  * Builds the Google consent screen URL. The CSRF `state` value must be
@@ -76,7 +92,7 @@ export async function exchangeCodeForTokens(code: string): Promise<void> {
 export async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const tokens = loadTokens();
   if (!tokens) {
-    throw new Error("YouTube bağlantısı bulunamadı. Lütfen önce OAuth akışını tamamlayın.");
+    throw new YouTubeConnectionError("YouTube bağlantısı bulunamadı. Lütfen önce OAuth akışını tamamlayın.");
   }
 
   const client = createOAuthClient();
@@ -102,7 +118,7 @@ export async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const isExpiring = tokens.expiryDate !== undefined && tokens.expiryDate < Date.now() + TOKEN_REFRESH_SKEW_MS;
   if (isExpiring) {
     if (!tokens.refreshToken) {
-      throw new Error("Erişim token'ının süresi doldu ve yenileme token'ı yok. Lütfen yeniden bağlanın.");
+      throw new YouTubeConnectionError("Erişim token'ının süresi doldu ve yenileme token'ı yok. Lütfen yeniden bağlanın.");
     }
 
     const { credentials } = await client.refreshAccessToken();

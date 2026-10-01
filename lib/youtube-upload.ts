@@ -28,13 +28,28 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-function isRetryableError(error: unknown): boolean {
-  const status =
-    (error as { code?: number })?.code ?? (error as { response?: { status?: number } })?.response?.status;
+const RETRYABLE_NETWORK_CODES = new Set([
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "EPIPE",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+]);
 
-  if (typeof status === "number") {
+function isRetryableError(error: unknown): boolean {
+  const code = (error as { code?: number | string })?.code;
+  const status = (error as { response?: { status?: number } })?.response?.status;
+
+  if (typeof code === "string" && RETRYABLE_NETWORK_CODES.has(code)) {
+    // Transient network failures (connection reset, timeout, DNS hiccup, etc.)
+    return true;
+  }
+
+  const numericStatus = typeof code === "number" ? code : status;
+  if (typeof numericStatus === "number") {
     // Rate limiting and transient server errors are worth retrying.
-    return status === 429 || (status >= 500 && status < 600);
+    return numericStatus === 429 || (numericStatus >= 500 && numericStatus < 600);
   }
 
   return false;

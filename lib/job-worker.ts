@@ -12,6 +12,7 @@ import {
 } from "@/lib/job-queue";
 import { generateScript } from "@/lib/openai";
 import { splitIntoScenes } from "@/lib/scenes";
+import { YouTubeConnectionError } from "@/lib/youtube-client";
 import { uploadVideoToYouTube } from "@/lib/youtube-upload";
 
 const OUTPUT_ROOT = path.join(process.cwd(), "tmp", "jobs");
@@ -150,15 +151,10 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
             },
           });
         } catch (uploadError) {
-          const message = toErrorMessage(uploadError);
           // Missing/expired OAuth connection can't be fixed by retrying the
           // same job; surface it as a non-retryable failure instead.
-          const isConnectionError =
-            message.includes("YouTube bağlantısı bulunamadı") ||
-            message.includes("Google OAuth istemci bilgileri") ||
-            message.includes("yenileme token'ı yok");
-          if (isConnectionError) {
-            throw new NonRetryableJobError(message);
+          if (uploadError instanceof YouTubeConnectionError) {
+            throw new NonRetryableJobError(uploadError.message);
           }
           throw uploadError;
         }
