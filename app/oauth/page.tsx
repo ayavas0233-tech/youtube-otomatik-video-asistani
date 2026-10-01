@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import { getRedirectUri } from "@/lib/oauth-utils";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -11,9 +12,13 @@ export async function GET(request: Request) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/youtube/oauth-callback";
 
   if (!clientId || !clientSecret) {
+    return NextResponse.redirect(new URL("/oauth?error=missing_env", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
+  }
+
+  const redirectUri = getRedirectUri();
+  if (!redirectUri) {
     return NextResponse.redirect(new URL("/oauth?error=missing_env", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
   }
 
