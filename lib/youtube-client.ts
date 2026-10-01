@@ -88,8 +88,23 @@ export async function exchangeCodeForTokens(code: string): Promise<void> {
 /**
  * Returns an OAuth2Client populated with the stored credentials, refreshing
  * the access token first if it is expired (or about to expire).
+ *
+ * Calls are serialized through a module-level mutex: if two uploads run
+ * concurrently, this prevents them from racing to refresh and persist
+ * tokens at the same time (which could lose an update or trigger duplicate
+ * refresh requests to Google).
  */
-export async function getAuthenticatedClient(): Promise<OAuth2Client> {
+let clientMutex: Promise<unknown> = Promise.resolve();
+
+export function getAuthenticatedClient(): Promise<OAuth2Client> {
+  const run = clientMutex.then(() => acquireAuthenticatedClient());
+  // Keep the chain alive even if this call fails, without propagating the
+  // rejection to unrelated callers queued behind it.
+  clientMutex = run.catch(() => undefined);
+  return run;
+}
+
+async function acquireAuthenticatedClient(): Promise<OAuth2Client> {
   const tokens = loadTokens();
   if (!tokens) {
     throw new YouTubeConnectionError("YouTube bağlantısı bulunamadı. Lütfen önce OAuth akışını tamamlayın.");

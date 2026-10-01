@@ -2,7 +2,7 @@ import fs from "fs";
 
 import { google } from "googleapis";
 
-import { getAuthenticatedClient } from "@/lib/youtube-client";
+import { getAuthenticatedClient, YouTubeConnectionError } from "@/lib/youtube-client";
 
 export type YouTubeUploadOptions = {
   videoPath: string;
@@ -151,12 +151,24 @@ export async function uploadVideoToYouTube(
       };
     } catch (error) {
       lastError = error;
+
+      // A missing/expired OAuth connection can't be fixed by retrying the
+      // same upload; fail fast and preserve the error type so callers (e.g.
+      // the job worker) can treat it as non-retryable.
+      if (error instanceof YouTubeConnectionError) {
+        break;
+      }
+
       if (attempt < MAX_ATTEMPTS && isRetryableError(error)) {
         await wait(RETRY_BASE_DELAY_MS * attempt);
         continue;
       }
       break;
     }
+  }
+
+  if (lastError instanceof YouTubeConnectionError) {
+    throw lastError;
   }
 
   throw new Error(`YouTube video yüklemesi başarısız: ${toErrorMessage(lastError)}`);

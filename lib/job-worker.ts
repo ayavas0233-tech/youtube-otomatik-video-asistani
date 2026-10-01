@@ -154,13 +154,18 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
                   "PROCESSING",
                   undefined,
                   workerId,
-                ),
+                ).catch((progressError) => {
+                  console.error(
+                    `Job ${jobId}: failed to persist upload progress update`,
+                    progressError instanceof Error ? progressError.message : progressError,
+                  );
+                }),
               );
             },
           });
           await progressChain;
         } catch (uploadError) {
-          await progressChain.catch(() => undefined);
+          await progressChain;
           // Missing/expired OAuth connection can't be fixed by retrying the
           // same job; surface it as a non-retryable failure instead.
           if (uploadError instanceof YouTubeConnectionError) {
