@@ -18,18 +18,18 @@ export async function GET(request: Request) {
 
   // Google reported an error (e.g. the user denied consent).
   if (googleError) {
-    clearStateCookie();
+    await clearStateCookie();
     return redirectToOAuthPage("?error=access_denied");
   }
 
   // Constant-time CSRF validation: the returned `state` must match the
   // HttpOnly cookie set when the auth URL was generated.
-  if (!validateState(state)) {
-    clearStateCookie();
+  if (!(await validateState(state))) {
+    await clearStateCookie();
     return redirectToOAuthPage("?error=invalid_state");
   }
 
-  clearStateCookie();
+  await clearStateCookie();
 
   if (!code) {
     return redirectToOAuthPage("?error=missing_code");

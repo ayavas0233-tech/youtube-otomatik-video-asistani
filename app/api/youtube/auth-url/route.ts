@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const state = generateState();
     const authUrl = buildAuthUrl(state);
-    setStateCookie(state);
+    await setStateCookie(state);
 
     return NextResponse.json({ ok: true, authUrl });
   } catch (error) {

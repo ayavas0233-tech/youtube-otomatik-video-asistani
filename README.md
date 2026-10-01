@@ -183,7 +183,7 @@ GET  /api/video/job/:jobId              - İş durumunu kontrol et
 
 ## 📦 Teknoloji Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **AI**: OpenAI API
 - **TTS**: OpenAI / ElevenLabs

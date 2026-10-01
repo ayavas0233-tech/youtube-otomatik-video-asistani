@@ -19,8 +19,8 @@ export function generateState(): string {
  * verified when Google redirects back to the callback. The value is never
  * exposed to client-side JavaScript.
  */
-export function setStateCookie(state: string): void {
-  cookies().set(STATE_COOKIE_NAME, state, {
+export async function setStateCookie(state: string): Promise<void> {
+  (await cookies()).set(STATE_COOKIE_NAME, state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -29,8 +29,8 @@ export function setStateCookie(state: string): void {
   });
 }
 
-export function clearStateCookie(): void {
-  cookies().set(STATE_COOKIE_NAME, "", {
+export async function clearStateCookie(): Promise<void> {
+  (await cookies()).set(STATE_COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -44,12 +44,12 @@ export function clearStateCookie(): void {
  * HttpOnly cookie set when the auth URL was generated, using a
  * constant-time comparison to prevent timing attacks.
  */
-export function validateState(receivedState: string | null): boolean {
+export async function validateState(receivedState: string | null): Promise<boolean> {
   if (!receivedState) {
     return false;
   }
 
-  const expected = cookies().get(STATE_COOKIE_NAME)?.value;
+  const expected = (await cookies()).get(STATE_COOKIE_NAME)?.value;
   if (!expected) {
     return false;
   }
