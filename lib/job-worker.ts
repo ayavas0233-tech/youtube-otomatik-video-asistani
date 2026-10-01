@@ -12,6 +12,7 @@ import {
 } from "@/lib/job-queue";
 import { generateScript } from "@/lib/openai";
 import { splitIntoScenes } from "@/lib/scenes";
+import { uploadVideoToYouTube } from "@/lib/youtube-upload";
 
 const OUTPUT_ROOT = path.join(process.cwd(), "tmp", "jobs");
 
@@ -123,26 +124,44 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
       if (job.payload.uploadToYouTube) {
         await updateJobProgress(
           jobId,
-          98,
+          90,
           `YouTube upload starting (${job.payload.privacyStatus || "private"})`,
           "PROCESSING",
           undefined,
           workerId,
         );
-        await wait(100);
 
-        const mockBaseUrl = process.env.YOUTUBE_MOCK_BASE_URL;
-        if (!mockBaseUrl) {
-          throw new NonRetryableJobError(
-            "YouTube upload requested but YOUTUBE_MOCK_BASE_URL is not configured.",
-          );
+        try {
+          youtube = await uploadVideoToYouTube({
+            videoPath,
+            title: job.payload.title || "Yapay Zeka ile Kâr Edin",
+            description: job.payload.topic,
+            privacyStatus: job.payload.privacyStatus || "private",
+            thumbnailPath,
+            onProgress: (percent) => {
+              void updateJobProgress(
+                jobId,
+                Math.min(99, 90 + Math.round((percent / 100) * 9)),
+                `YouTube upload progress %${percent}`,
+                "PROCESSING",
+                undefined,
+                workerId,
+              );
+            },
+          });
+        } catch (uploadError) {
+          const message = toErrorMessage(uploadError);
+          // Missing/expired OAuth connection can't be fixed by retrying the
+          // same job; surface it as a non-retryable failure instead.
+          const isConnectionError =
+            message.includes("YouTube bağlantısı bulunamadı") ||
+            message.includes("Google OAuth istemci bilgileri") ||
+            message.includes("yenileme token'ı yok");
+          if (isConnectionError) {
+            throw new NonRetryableJobError(message);
+          }
+          throw uploadError;
         }
-
-        const videoId = `${job.payload.privacyStatus || "private"}-${jobId.slice(0, 12)}`;
-        youtube = {
-          videoId,
-          url: `${mockBaseUrl.replace(/\/$/, "")}/${videoId}`,
-        };
       }
 
       const completion = await completeJob(

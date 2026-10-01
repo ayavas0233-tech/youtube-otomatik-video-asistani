@@ -32,42 +32,21 @@ Yapay zeka destekli, otomatik video üretim ve YouTube'a yükleme platformu.
 
 `.env.local` dosyası oluşturun:
 
+`.env.example` dosyasındaki tüm değişkenlerin güncel ve doğrulanmış açıklaması için o dosyaya bakın. Özet:
+
 ```env
-# =========================================================
-# OpenAI
-# =========================================================
+# OpenAI (AI senaryo, görsel ve TTS için)
 OPENAI_API_KEY=sk_...
-OPENAI_MODEL=gpt-4o-mini
 
-# =========================================================
-# TTS Provider (OpenAI veya ElevenLabs)
-# =========================================================
-ELEVENLABS_API_KEY=
-ELEVENLABS_MODEL_ID=eleven_multilingual_v2
-TTS_PROVIDER=elevenlabs
-
-# =========================================================
 # Google / YouTube OAuth
-# =========================================================
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/youtube/oauth-callback
 
-# =========================================================
-# Token Storage & Encryption
-# =========================================================
-TOKEN_STORAGE_PROVIDER=env
+# Token Encryption (ZORUNLU - AES-256-GCM)
 TOKEN_ENCRYPTION_KEY=
 
-# =========================================================
-# Video Processing
-# =========================================================
-FFMPEG_PATH=ffmpeg
-FFPROBE_PATH=ffprobe
-
-# =========================================================
 # Application
-# =========================================================
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -115,14 +94,12 @@ Tarayıcı açın: http://localhost:3000
 ### İş Oluştur
 
 ```bash
-POST /api/jobs/create
+POST /api/video/job
 Content-Type: application/json
 
 {
   "topic": "Yapay Zeka ile Para Kazanma",
   "title": "AI ile 5 Kolay Yol",
-  "description": "Yapay zeka kullanarak para kazanmanın 5 etkili yolu",
-  "tags": ["AI", "money", "tutorial"],
   "audience": "Girişimciler",
   "tone": "Motivasyonlu",
   "duration": "5-7 dakika",
@@ -137,25 +114,26 @@ Content-Type: application/json
 {
   "ok": true,
   "jobId": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "PENDING"
+  "message": "Job queued for processing",
+  "statusUrl": "/api/video/job/550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
 ### İş Durumunu İzle
 
 ```bash
-GET /api/jobs/{jobId}/status
+GET /api/video/job/{jobId}
 ```
 
 ### İlerleme Takibi
 
 ```
-10% - Senaryo üretiliyor
-25% - Ses kaydı yapılıyor
-45% - Video render ediliyor
-75% - Altyazı ekleniyor
-90% - Thumbnail oluşturuluyor
-100% - YouTube'a yüklendi
+10% - Senaryo üretimi başlıyor
+30% - Sahneler hazır
+40-95% - Görsel/TTS/video/altyazı/thumbnail adımları
+90% - YouTube yükleme başlıyor (uploadToYouTube=true ise)
+90-99% - YouTube yükleme ilerlemesi
+100% - Tamamlandı
 ```
 
 ## 🔐 Gizlilik Ayarları
@@ -195,11 +173,12 @@ GET /api/jobs/{jobId}/status
 ### API Endpoints
 
 ```
-GET  /api/youtube/auth-url              - OAuth URL oluştur
-GET  /api/youtube/oauth-callback        - OAuth callback handler
-GET  /api/youtube/status                - Bağlantı durumu
-POST /api/jobs/create                   - İş oluştur
-GET  /api/jobs/:id/status               - İş durumunu kontrol et
+GET  /api/youtube/auth-url              - OAuth URL oluştur (state cookie set eder)
+GET  /api/youtube/oauth-callback        - OAuth callback handler (state doğrular, token saklar)
+GET  /api/youtube/status                - Bağlantı durumu (token'ları ifşa etmez)
+POST /api/video/job                     - Video işi oluştur
+GET  /api/video/job                     - İşleri listele
+GET  /api/video/job/:jobId              - İş durumunu kontrol et
 ```
 
 ## 📦 Teknoloji Stack
@@ -215,10 +194,18 @@ GET  /api/jobs/:id/status               - İş durumunu kontrol et
 
 ## ⚠️ Sınırlamalar (Current)
 
-- Single-account token storage (development)
-- In-memory job queue (restarts on deploy)
-- Mock video/audio generation (scaffold)
+- Single-account token storage (çok kullanıcılı değil)
+- Dosya tabanlı job queue (`tmp/` altında; sunucu yeniden başlatılırsa korunur ama tek makineye bağlıdır)
+- Video/ses üretimi hâlâ placeholder dosyalar yazıyor (gerçek FFmpeg/TTS render pipeline'ı ayrı bir iş)
 - No database persistence
+
+## 🚀 Production Notları
+
+- **HTTPS zorunlu**: `NODE_ENV=production` olduğunda OAuth state cookie'si `secure` bayrağıyla ayarlanır; uygulamayı mutlaka HTTPS arkasında çalıştırın.
+- **TOKEN_ENCRYPTION_KEY'i güvenli tutun**: Bu anahtar olmadan şifreli token dosyası çözülemez. Anahtarı bir secret manager'da saklayın ve asla repoya commit etmeyin.
+- **Token dosyası**: Şifreli YouTube token'ları `tmp/youtube-token-store/tokens.enc` içinde saklanır; bu dizin `.gitignore` ile hariç tutulmuştur ve konteyner/sunucu yeniden oluşturulduğunda silinir (yeniden bağlanma gerekir).
+- **Yatay ölçekleme**: Dosya tabanlı job queue ve token store tek instance için uygundur. Çoklu instance/production ortamında Redis + harici (DB/KMS) bir token deposuna geçilmesi önerilir.
+- **Quota**: YouTube Data API v3 günlük kota sınırlarına tabidir; `videos.insert` yüksek maliyetli bir işlemdir.
 
 ## 📈 Production Roadmap
 
@@ -236,7 +223,7 @@ GET  /api/jobs/:id/status               - İş durumunu kontrol et
 ### TOKEN_ENCRYPTION_KEY hatası
 
 ```
-Error: TOKEN_ENCRYPTION_KEY environment variable is not set
+Error: TOKEN_ENCRYPTION_KEY ortam değişkeni tanımlı değil.
 ```
 
 **Çözüm:**
@@ -249,7 +236,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### GOOGLE_CLIENT_ID hatası
 
 ```
-Error: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required
+Error: Google OAuth istemci bilgileri (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) eksik.
 ```
 
 **Çözüm:** Google Cloud Console'dan credentials oluşturun.
@@ -257,7 +244,7 @@ Error: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required
 ### YouTube bağlantı hatası
 
 ```
-Error: YouTube account not connected
+Error: YouTube bağlantısı bulunamadı. Lütfen önce OAuth akışını tamamlayın.
 ```
 
 **Çözüm:** Önce "YouTube'a Bağlan" butonuna tıklayın.

@@ -1,29 +1,47 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
+
+import { exchangeCodeForTokens } from "@/lib/youtube-client";
+import { clearStateCookie, validateState } from "@/lib/oauth-state-manager";
+
+export const dynamic = "force-dynamic";
+
+function redirectToOAuthPage(query: string): NextResponse {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return NextResponse.redirect(new URL(`/oauth${query}`, appUrl));
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
+  const googleError = searchParams.get("error");
 
-  if (!code) {
-    return NextResponse.json({ ok: false, message: "Authorization code bulunamadı." }, { status: 400 });
+  // Google reported an error (e.g. the user denied consent).
+  if (googleError) {
+    clearStateCookie();
+    return redirectToOAuthPage("?error=access_denied");
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/youtube/oauth-callback";
+  // Constant-time CSRF validation: the returned `state` must match the
+  // HttpOnly cookie set when the auth URL was generated.
+  if (!validateState(state)) {
+    clearStateCookie();
+    return redirectToOAuthPage("?error=invalid_state");
+  }
 
-  if (!clientId || !clientSecret) {
-    return NextResponse.json({ ok: false, message: "Google OAuth ortamı eksik." }, { status: 500 });
+  clearStateCookie();
+
+  if (!code) {
+    return redirectToOAuthPage("?error=missing_code");
   }
 
   try {
-    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-    const { tokens } = await oauth2Client.getToken(code);
-
-    return NextResponse.json({ ok: true, tokens });
+    // Tokens are exchanged and encrypted/stored server-side only. They are
+    // never included in the redirect URL, response body, or logs.
+    await exchangeCodeForTokens(code);
+    return redirectToOAuthPage("?status=success");
   } catch (error) {
-    console.error("OAuth token exchange failed", error);
-    return NextResponse.json({ ok: false, message: "Token değişimi başarısız." }, { status: 500 });
+    console.error("OAuth token exchange failed:", error instanceof Error ? error.message : error);
+    return redirectToOAuthPage("?error=token_exchange_failed");
   }
 }
