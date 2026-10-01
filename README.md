@@ -66,9 +66,9 @@ ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 TTS_PROVIDER=elevenlabs
 
 # Google / YouTube OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/youtube/oauth-callback
+GOOGLE_CLIENT_ID=BURAYA_GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET=BURAYA_GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI=https://youtube-otomatik-video-asistani.vercel.app/api/youtube/oauth-callback
 
 # Token Storage & Encryption
 TOKEN_STORAGE_PROVIDER=env
@@ -79,7 +79,7 @@ FFMPEG_PATH=ffmpeg
 FFPROBE_PATH=ffprobe
 
 # Application
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://youtube-otomatik-video-asistani.vercel.app
 ```
 
 ### 6. Uygulamayı Başlat
