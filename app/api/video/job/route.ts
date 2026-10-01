@@ -1,6 +1,7 @@
 import { createJob, listJobs } from "@/lib/job-queue";
 import { VideoJobPayload } from "@/lib/job-types";
 import { startJobWorker } from "@/lib/job-worker";
+import { apiErrorResponse } from "@/lib/api-error";
 
 function isValidPayload(payload: unknown): payload is VideoJobPayload {
   if (!payload || typeof payload !== "object") {
@@ -20,16 +21,25 @@ function isValidPayload(payload: unknown): payload is VideoJobPayload {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch (error) {
+      return apiErrorResponse({
+        error: "Invalid JSON request body",
+        errorCode: "INVALID_JSON",
+        statusCode: 400,
+        cause: error,
+      });
+    }
+
     if (!isValidPayload(payload)) {
-      return Response.json(
-        {
-          ok: false,
-          message:
-            "Geçerli bir topic zorunludur. privacyStatus yalnızca uploadToYouTube=true iken kullanılabilir.",
-        },
-        { status: 400 },
-      );
+      return apiErrorResponse({
+        error:
+          "Geçerli bir topic zorunludur. privacyStatus yalnızca uploadToYouTube=true iken kullanılabilir.",
+        errorCode: "INVALID_JOB_PAYLOAD",
+        statusCode: 400,
+      });
     }
 
     const job = createJob({
@@ -50,44 +60,53 @@ export async function POST(request: Request) {
         ok: true,
         jobId: job.jobId,
         message: "Job queued for processing",
-        statusUrl: `/api/video/job/${job.jobId}`,
+        statusUrl: `/api/jobs/${job.jobId}/status`,
       },
       { status: 202 },
     );
   } catch (error) {
-    console.error("video-job enqueue failed", error);
-    return Response.json(
-      { ok: false, message: "Video işi kuyruğa alınamadı." },
-      { status: 500 },
-    );
+    return apiErrorResponse({
+      error: "Video işi kuyruğa alınamadı.",
+      errorCode: "JOB_CREATE_FAILED",
+      statusCode: 500,
+      cause: error,
+    });
   }
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
-  const validStatuses = ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] as const;
-  if (status && !validStatuses.includes(status as (typeof validStatuses)[number])) {
-    return Response.json(
-      {
-        ok: false,
-        message: "Invalid status filter. Use PENDING, PROCESSING, COMPLETED, or FAILED.",
-      },
-      { status: 400 },
-    );
+  try {
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+    const validStatuses = ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] as const;
+    if (status && !validStatuses.includes(status as (typeof validStatuses)[number])) {
+      return apiErrorResponse({
+        error: "Invalid status filter",
+        errorCode: "INVALID_STATUS_FILTER",
+        statusCode: 400,
+        message: "Use PENDING, PROCESSING, COMPLETED, or FAILED.",
+      });
+    }
+
+    const jobs = listJobs(status as (typeof validStatuses)[number] | undefined);
+
+    return Response.json({
+      ok: true,
+      jobs: jobs.map((job) => ({
+        jobId: job.jobId,
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.currentStep,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    return apiErrorResponse({
+      error: "Unable to list jobs",
+      errorCode: "JOB_LIST_FAILED",
+      statusCode: 500,
+      cause: error,
+    });
   }
-
-  const jobs = listJobs(status as (typeof validStatuses)[number] | undefined);
-
-  return Response.json({
-    ok: true,
-    jobs: jobs.map((job) => ({
-      jobId: job.jobId,
-      status: job.status,
-      progress: job.progress,
-      currentStep: job.currentStep,
-      createdAt: job.createdAt.toISOString(),
-      updatedAt: job.updatedAt.toISOString(),
-    })),
-  });
 }
