@@ -132,6 +132,12 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
           workerId,
         );
 
+        // onProgress fires synchronously as upload chunks are sent; chain the
+        // resulting async updateJobProgress calls so they're applied in order
+        // and a later (higher) percentage can never be overwritten by an
+        // earlier update that happened to resolve after it.
+        let progressChain: Promise<unknown> = Promise.resolve();
+
         try {
           youtube = await uploadVideoToYouTube({
             videoPath,
@@ -140,17 +146,21 @@ async function processJob(jobId: string, workerId: string): Promise<void> {
             privacyStatus: job.payload.privacyStatus || "private",
             thumbnailPath,
             onProgress: (percent) => {
-              void updateJobProgress(
-                jobId,
-                Math.min(99, 90 + Math.round((percent / 100) * 9)),
-                `YouTube upload progress %${percent}`,
-                "PROCESSING",
-                undefined,
-                workerId,
+              progressChain = progressChain.then(() =>
+                updateJobProgress(
+                  jobId,
+                  Math.min(99, 90 + Math.round((percent / 100) * 9)),
+                  `YouTube upload progress %${percent}`,
+                  "PROCESSING",
+                  undefined,
+                  workerId,
+                ),
               );
             },
           });
+          await progressChain;
         } catch (uploadError) {
+          await progressChain.catch(() => undefined);
           // Missing/expired OAuth connection can't be fixed by retrying the
           // same job; surface it as a non-retryable failure instead.
           if (uploadError instanceof YouTubeConnectionError) {
