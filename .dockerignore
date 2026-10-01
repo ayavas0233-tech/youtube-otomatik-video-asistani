@@ -1,0 +1,16 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+.next
+dist
+build
+coverage
+.env*
+.npm
+.npmrc
+npm-debug.log*
+.yarn
+.yarnrc*
+yarn-debug.log*
+.pnp.*

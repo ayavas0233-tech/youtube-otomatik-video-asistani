@@ -90,6 +90,28 @@ npm run dev
 
 Tarayıcı açın: http://localhost:3000
 
+## 🐳 Docker ile Hızlı Başlangıç
+
+Docker ve Docker Compose kurulu olmalıdır. Önce `.env.local` dosyasını oluşturup ortam değişkenlerinizi ayarlayın:
+
+```bash
+cp .env.example .env.local
+```
+
+Geliştirme sunucusunu hot reload ile başlatmak için:
+
+```bash
+docker compose --profile development up --build
+```
+
+Üretim imajını çalıştırmak için:
+
+```bash
+docker compose --profile production up --build
+```
+
+Uygulama [http://localhost:3000](http://localhost:3000) adresinde çalışır. Dockerfile hedefleri, ortam değişkenleri ve sorun giderme hakkında ayrıntılar için [Docker rehberine](DOCKER.md) bakın.
+
 ## 📺 YouTube Bağlantısı
 
 ### OAuth Akışı
