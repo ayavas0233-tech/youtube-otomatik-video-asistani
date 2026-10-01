@@ -16,7 +16,14 @@ Yapay zeka destekli, otomatik video üretim ve YouTube'a yükleme platformu.
 
 ## 🚀 Kurulum
 
-### 1. Google Cloud Projesi Oluştur
+### 1. Repoyu Clone Edin
+
+```bash
+git clone https://github.com/ayavas0233-tech/youtube-otomatik-video-asistani.git
+cd youtube-otomatik-video-asistani
+```
+
+### 2. Google Cloud Projesi Oluştur
 
 1. [Google Cloud Console](https://console.cloud.google.com) açın
 2. Yeni bir proje oluşturun
@@ -28,50 +35,13 @@ Yapay zeka destekli, otomatik video üretim ve YouTube'a yükleme platformu.
    http://localhost:3000/api/youtube/oauth-callback
    ```
 
-### 2. Ortam Değişkenlerini Yapılandır
+### 3. Bağımlılıkları Yükle
 
-`.env.local` dosyası oluşturun:
-
-```env
-# =========================================================
-# OpenAI
-# =========================================================
-OPENAI_API_KEY=sk_...
-OPENAI_MODEL=gpt-4o-mini
-
-# =========================================================
-# TTS Provider (OpenAI veya ElevenLabs)
-# =========================================================
-ELEVENLABS_API_KEY=
-ELEVENLABS_MODEL_ID=eleven_multilingual_v2
-TTS_PROVIDER=elevenlabs
-
-# =========================================================
-# Google / YouTube OAuth
-# =========================================================
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/youtube/oauth-callback
-
-# =========================================================
-# Token Storage & Encryption
-# =========================================================
-TOKEN_STORAGE_PROVIDER=env
-TOKEN_ENCRYPTION_KEY=
-
-# =========================================================
-# Video Processing
-# =========================================================
-FFMPEG_PATH=ffmpeg
-FFPROBE_PATH=ffprobe
-
-# =========================================================
-# Application
-# =========================================================
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+```bash
+npm install
 ```
 
-### 3. Encryption Key Oluştur
+### 4. Encryption Key Oluştur
 
 TOKEN_ENCRYPTION_KEY için 32 byte hex string gerekli:
 
@@ -79,15 +49,40 @@ TOKEN_ENCRYPTION_KEY için 32 byte hex string gerekli:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Çıktıyı `.env.local`'a kopyalayın.
+Çıktıyı not edin, sonra `.env.local`'a kopyalayacaksınız.
 
-### 4. Bağımlılıkları Yükle
+### 5. Ortam Değişkenlerini Yapılandır
 
-```bash
-npm install
+`.env.local` dosyası oluşturun ve aşağıdaki içeriği yapıştırın:
+
+```env
+# OpenAI
+OPENAI_API_KEY=sk_...
+OPENAI_MODEL=gpt-4o-mini
+
+# TTS Provider (OpenAI veya ElevenLabs)
+ELEVENLABS_API_KEY=
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+TTS_PROVIDER=elevenlabs
+
+# Google / YouTube OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/youtube/oauth-callback
+
+# Token Storage & Encryption
+TOKEN_STORAGE_PROVIDER=env
+TOKEN_ENCRYPTION_KEY=<Adım 4'te oluşturduğunuz key>
+
+# Video Processing
+FFMPEG_PATH=ffmpeg
+FFPROBE_PATH=ffprobe
+
+# Application
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### 5. Uygulamayı Başlat
+### 6. Uygulamayı Başlat
 
 ```bash
 npm run dev
@@ -105,7 +100,7 @@ Tarayıcı açın: http://localhost:3000
 4. Otomatik olarak uygulamaya yönlendirilirsiniz
 5. YouTube hesabınız bağlandı ✅
 
-**Güvenlik Notu:** 
+**Güvenlik Notu:**
 - Tokens sunucu tarafında şifrelenmiş olarak saklanır
 - Browser'a token gönderilmez
 - Oturum kapatıldığında tokens silinir
@@ -204,7 +199,7 @@ GET  /api/jobs/:id/status               - İş durumunu kontrol et
 
 ## 📦 Teknoloji Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
 - **AI**: OpenAI API
 - **TTS**: OpenAI / ElevenLabs
@@ -213,7 +208,7 @@ GET  /api/jobs/:id/status               - İş durumunu kontrol et
 - **Auth**: OAuth 2.0
 - **Encryption**: Node.js crypto (AES-256-GCM)
 
-## ⚠️ Sınırlamalar (Current)
+## ⚠️ Sınırlamalar (Şu Anki)
 
 - Single-account token storage (development)
 - In-memory job queue (restarts on deploy)
