@@ -87,13 +87,25 @@ export async function uploadVideoToYouTube(
 
   const fileSize = fs.statSync(videoPath).size;
 
+  // Keep reported progress monotonic across retries: a failed attempt that
+  // got past 10% shouldn't cause the UI/job status to jump back down when
+  // the next attempt restarts from scratch.
+  let highestProgress = 0;
+  const reportProgress = (percent: number) => {
+    if (percent <= highestProgress) {
+      return;
+    }
+    highestProgress = percent;
+    onProgress?.(percent);
+  };
+
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const auth = await getAuthenticatedClient();
       const youtube = google.youtube({ version: "v3", auth });
 
-      onProgress?.(10);
+      reportProgress(10);
 
       const response = await youtube.videos.insert(
         {
@@ -117,11 +129,11 @@ export async function uploadVideoToYouTube(
         },
         {
           onUploadProgress: (event) => {
-            if (!fileSize || !onProgress) {
+            if (!fileSize) {
               return;
             }
             const uploadFraction = Math.min(1, event.bytesRead / fileSize);
-            onProgress(Math.min(95, Math.round(10 + uploadFraction * 85)));
+            reportProgress(Math.min(95, Math.round(10 + uploadFraction * 85)));
           },
         },
       );
@@ -143,7 +155,7 @@ export async function uploadVideoToYouTube(
         }
       }
 
-      onProgress?.(100);
+      reportProgress(100);
 
       return {
         videoId,

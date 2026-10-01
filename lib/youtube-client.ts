@@ -137,13 +137,9 @@ async function acquireAuthenticatedClient(): Promise<OAuth2Client> {
     }
 
     const { credentials } = await client.refreshAccessToken();
-    saveTokens({
-      accessToken: credentials.access_token || tokens.accessToken,
-      refreshToken: credentials.refresh_token || tokens.refreshToken,
-      expiryDate: credentials.expiry_date ?? undefined,
-      scope: credentials.scope,
-      tokenType: credentials.token_type ?? undefined,
-    });
+    // The "tokens" listener above already persisted the refreshed
+    // credentials when Google emitted the "tokens" event; just update the
+    // in-memory client so subsequent calls in this request use it.
     client.setCredentials(credentials);
   }
 
