@@ -3,6 +3,7 @@
 .next/
 out/
 node_modules/
+tmp/
 coverage/
 *.log
 .DS_Store
