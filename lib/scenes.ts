@@ -1,5 +1,3 @@
-import { Scene } from "@/lib/scenes";
-
 export type Scene = {
   id: number;
   title: string;
