@@ -1,0 +1,24 @@
+services:
+  app-development:
+    profiles: ["development"]
+    build:
+      context: .
+      target: development
+    env_file:
+      - .env.local
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+  app-production:
+    profiles: ["production"]
+    build:
+      context: .
+      target: production
+    env_file:
+      - .env.local
+    ports:
+      - "3000:3000"
