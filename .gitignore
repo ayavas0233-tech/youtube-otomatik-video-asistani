@@ -1,11 +1,31 @@
-# .gitignore
+# Dependencies
+node_modules/
 
+# Build output
 .next/
 out/
-node_modules/
-coverage/
-*.log
-.DS_Store
+build/
+dist/
+
+# Environment
 .env
 .env.local
 .env.*.local
+
+# Temporary files
+tmp/
+.data/
+*.enc
+*.log
+
+# System
+.DS_Store
+.vscode/
+.idea/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Testing
+.test-cache/
