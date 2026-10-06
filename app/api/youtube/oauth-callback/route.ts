@@ -74,10 +74,10 @@ export async function GET(request: NextRequest) {
     // Save tokens securely (encrypted)
     await saveYouTubeTokens({
       access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expiry_date: tokens.expiry_date,
-      token_type: tokens.token_type,
-      scope: tokens.scope,
+      refresh_token: tokens.refresh_token ?? undefined,
+      expiry_date: tokens.expiry_date ?? undefined,
+      token_type: tokens.token_type ?? undefined,
+      scope: tokens.scope ?? undefined,
     });
 
     // Clear state cookie

@@ -1,299 +1,353 @@
-"use client";
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #172033;
+  background: #f4f6fb;
+}
 
-import { useMemo, useState } from "react";
+* {
+  box-sizing: border-box;
+}
 
-type FormState = {
-  title: string;
-  topic: string;
-  audience: string;
-  tone: string;
-  duration: string;
-  voice: string;
-};
+body {
+  margin: 0;
+  min-width: 320px;
+}
 
-type PipelineResult = {
-  title: string;
-  headline: string;
-  summary: string;
-  stages: Array<{ name: string; status: string; detail: string }>;
-  script: string[];
-  thumbnailPrompt: string;
-  youtubeTitle: string;
-};
+button,
+input,
+select {
+  font: inherit;
+}
 
-const initialForm: FormState = {
-  title: "Yapay Zeka ile Kâr Edin",
-  topic: "Güncel AI iş fırsatları",
-  audience: "Yeni başlayan girişimciler",
-  tone: "Motivasyonlu ve net",
-  duration: "6 dakika",
-  voice: "Turkish Female 01",
-};
+button {
+  cursor: pointer;
+}
 
-const pipelineStages = [
-  { name: "AI Senaryo", status: "Hazır" },
-  { name: "TTS", status: "Demo" },
-  { name: "Görseller", status: "Planlandı" },
-  { name: "FFmpeg", status: "Bekliyor" },
-  { name: "Altyazı", status: "Bekliyor" },
-  { name: "Thumbnail", status: "Bekliyor" },
-  { name: "YouTube Yükleme", status: "Sonraki adım" },
-];
+.page-shell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 100vh;
+}
 
-const statCards = [
-  { label: "Video üretim", value: "24", hint: "Bu hafta" },
-  { label: "Ortalama süre", value: "6 dk", hint: "Maksimum 10 dk" },
-  { label: "Yükleme başarısı", value: "86%", hint: "Demo akışı" },
-  { label: "Iş akışı", value: "7 adım", hint: "Otomatik" },
-];
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 28px 20px;
+  color: #eef2ff;
+  background: #17213a;
+}
 
-export default function Home() {
-  const [form, setForm] = useState<FormState>(initialForm);
-  const [demoMode, setDemoMode] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PipelineResult | null>(null);
+.brand-row,
+.topbar,
+.section-header,
+.hero-panel,
+.actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 
-  const summary = useMemo(() => {
-    return {
-      headline: `${form.title} için otomatik üretim başlatıldı`,
-      subtitle: `Tema: ${form.topic} · Hedef: ${form.audience}`,
-    };
-  }, [form]);
+.brand-row {
+  justify-content: flex-start;
+}
 
-  const handleChange = (field: keyof FormState, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+.brand-mark,
+.step-index {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: white;
+  background: #536dfe;
+  font-weight: 700;
+}
 
-  const handleGenerateDemo = async () => {
-    setLoading(true);
+.eyebrow {
+  margin: 0 0 7px;
+  color: #8292b4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+.sidebar h1,
+.topbar h2,
+.hero-panel h3,
+.section-header h3 {
+  margin: 0;
+}
 
-      const data = await response.json();
-      setResult(data);
-    } catch (error) {
-      console.error(error);
-      setResult({
-        title: form.title,
-        headline: "Demo üretim hatası",
-        summary: `Tema: ${form.topic} · Hedef: ${form.audience} · Ton: ${form.tone}`,
-        stages: [
-          { name: "AI Senaryosu", status: "Tamamlandı", detail: "Yerel fallback devrede" },
-          { name: "TTS", status: "Hazır", detail: "Türkçe ses planı hazır" },
-          { name: "Görseller", status: "Hazır", detail: "Ana başlık görseli üretildi" },
-          { name: "FFmpeg", status: "Bekliyor", detail: "Montaj sıralaması planlandı" },
-        ],
-        script: [
-          "Giriş cümlesi hazırlandı.",
-          "Sorun tanımı ve iş modeli açıklandı.",
-          "Adım adım çözüm sunumu hazırlandı.",
-          "Kapanış ve CTA planı hazırlandı.",
-        ],
-        thumbnailPrompt: "Yüksek kontrastlı modern YouTube thumbnail, başlık kartları, teknoloji teması, Türkçe metin, net görünüm",
-        youtubeTitle: `${form.title} | ${form.topic}`,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+.sidebar h1 {
+  font-size: 18px;
+}
 
-  return (
-    <main className="page-shell">
-      <aside className="sidebar">
-        <div className="brand-row">
-          <div className="brand-mark">YT</div>
-          <div>
-            <p className="eyebrow">Dashboard</p>
-            <h1>Video Asistanı</h1>
-          </div>
-        </div>
+.nav,
+.pipeline-list {
+  display: grid;
+  gap: 8px;
+}
 
-        <nav className="nav">
-          <button className="nav-item active">📊 Genel bakış</button>
-          <button className="nav-item">🎬 Yeni Video Oluştur</button>
-          <button className="nav-item">🧪 Demo Modu</button>
-          <button className="nav-item">⚙️ Ayarlar</button>
-        </nav>
+.nav-item {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px;
+  color: #c4cce0;
+  background: transparent;
+  text-align: left;
+}
 
-        <div className="sidebar-card">
-          <p className="eyebrow">Açık iş akışı</p>
-          <ul className="mini-list">
-            <li>AI → TTS → Görseller</li>
-            <li>FFmpeg → Altyazı</li>
-            <li>Thumbnail → YouTube</li>
-          </ul>
-        </div>
-      </aside>
+.nav-item.active,
+.nav-item:hover {
+  color: white;
+  background: #293653;
+}
 
-      <section className="content">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Türkçe üretim paneli</p>
-            <h2>Otomatik video üretim merkezi</h2>
-          </div>
-          <button
-            className={`demo-toggle ${demoMode ? "on" : ""}`}
-            onClick={() => setDemoMode((previous) => !previous)}
-          >
-            {demoMode ? "Demo açık" : "Demo kapalı"}
-          </button>
-        </header>
+.sidebar-card,
+.stat-card,
+.hero-panel,
+.editor-card,
+.pipeline-card,
+.result-panel {
+  border: 1px solid #e5e9f2;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 8px 24px rgb(24 39 75 / 5%);
+}
 
-        <div className="stats-grid">
-          {statCards.map((card) => (
-            <div key={card.label} className="stat-card">
-              <span>{card.label}</span>
-              <strong>{card.value}</strong>
-              <small>{card.hint}</small>
-            </div>
-          ))}
-        </div>
+.sidebar-card {
+  margin-top: auto;
+  padding: 18px;
+  color: #dce3f2;
+  background: #202d4a;
+}
 
-        <div className="hero-panel">
-          <div>
-            <p className="eyebrow">Sonraki üretim</p>
-            <h3>{summary.headline}</h3>
-            <p>{summary.subtitle}</p>
-          </div>
-          <button className="primary-button" onClick={handleGenerateDemo} disabled={loading}>
-            {loading ? "Üretiliyor..." : "Video üretimini başlat"}
-          </button>
-        </div>
+.mini-list {
+  margin: 0;
+  padding-left: 19px;
+  line-height: 1.9;
+}
 
-        {result ? (
-          <div className="result-panel">
-            <div className="section-header">
-              <h3>{result.title}</h3>
-              <span className="badge">Demo çıktısı</span>
-            </div>
+.content {
+  width: min(100%, 1500px);
+  margin: 0 auto;
+  padding: 34px;
+}
 
-            <h4>{result.headline}</h4>
-            <p>{result.summary}</p>
+.topbar {
+  margin-bottom: 24px;
+}
 
-            <div className="stage-grid">
-              {result.stages.map((stage) => (
-                <div key={stage.name} className="mini-stage">
-                  <strong>{stage.name}</strong>
-                  <span>{stage.status}</span>
-                  <small>{stage.detail}</small>
-                </div>
-              ))}
-            </div>
+.topbar h2 {
+  font-size: clamp(22px, 3vw, 30px);
+}
 
-            <div className="result-columns">
-              <div>
-                <h5>Senaryo</h5>
-                <ul>
-                  {result.script.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
+.demo-toggle,
+.primary-button,
+.secondary-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-weight: 700;
+}
 
-              <div>
-                <h5>Thumbnail prompt</h5>
-                <p>{result.thumbnailPrompt}</p>
-                <h5>YouTube başlığı</h5>
-                <p>{result.youtubeTitle}</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
+.demo-toggle {
+  color: #5e687e;
+  background: #e9edf5;
+}
 
-        <div className="workspace-grid">
-          <div className="editor-card">
-            <div className="section-header">
-              <h3>Yeni Video Oluştur</h3>
-              <span className="badge">Açık</span>
-            </div>
+.demo-toggle.on,
+.primary-button {
+  color: white;
+  background: #536dfe;
+}
 
-            <div className="form-grid">
-              <label>
-                Video başlığı
-                <input
-                  value={form.title}
-                  onChange={(event) => handleChange("title", event.target.value)}
-                />
-              </label>
-              <label>
-                Konu
-                <input
-                  value={form.topic}
-                  onChange={(event) => handleChange("topic", event.target.value)}
-                />
-              </label>
-              <label>
-                Hedef kitle
-                <input
-                  value={form.audience}
-                  onChange={(event) => handleChange("audience", event.target.value)}
-                />
-              </label>
-              <label>
-                Ton / Stil
-                <input
-                  value={form.tone}
-                  onChange={(event) => handleChange("tone", event.target.value)}
-                />
-              </label>
-              <label>
-                Süre
-                <select
-                  value={form.duration}
-                  onChange={(event) => handleChange("duration", event.target.value)}
-                >
-                  <option>3 dakika</option>
-                  <option>6 dakika</option>
-                  <option>8 dakika</option>
-                  <option>12 dakika</option>
-                </select>
-              </label>
-              <label>
-                Ses / TTS
-                <select
-                  value={form.voice}
-                  onChange={(event) => handleChange("voice", event.target.value)}
-                >
-                  <option>Turkish Female 01</option>
-                  <option>Turkish Male 02</option>
-                  <option>Neutral Narrator</option>
-                </select>
-              </label>
-            </div>
+.primary-button:hover {
+  background: #4059e8;
+}
 
-            <div className="actions-row">
-              <button className="primary-button" onClick={handleGenerateDemo} disabled={loading}>
-                {loading ? "İşleniyor..." : "Önizleme oluştur"}
-              </button>
-              <button className="secondary-button">Taslağı kaydet</button>
-            </div>
-          </div>
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
-          <div className="pipeline-card">
-            <div className="section-header">
-              <h3>İş Akışı</h3>
-              <span className="badge muted">Pipeline</span>
-            </div>
+.secondary-button {
+  color: #34415a;
+  background: #e9edf5;
+}
 
-            <div className="pipeline-list">
-              {pipelineStages.map((stage, index) => (
-                <div key={stage.name} className="pipeline-item">
-                  <div className="step-index">{index + 1}</div>
-                  <div>
-                    <strong>{stage.name}</strong>
-                    <small>{stage.status}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.stat-card span,
+.stat-card small,
+.pipeline-item small,
+.mini-stage small {
+  color: #778198;
+}
+
+.stat-card strong {
+  font-size: 25px;
+}
+
+.hero-panel {
+  margin-bottom: 20px;
+  padding: 22px;
+}
+
+.hero-panel p:not(.eyebrow) {
+  margin-bottom: 0;
+  color: #778198;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.editor-card,
+.pipeline-card,
+.result-panel {
+  padding: 22px;
+}
+
+.section-header {
+  margin-bottom: 20px;
+}
+
+.badge {
+  border-radius: 99px;
+  padding: 6px 10px;
+  color: #3348c6;
+  background: #edf0ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge.muted {
+  color: #667085;
+  background: #f0f2f6;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 8px;
+  color: #525d73;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dce1eb;
+  border-radius: 9px;
+  padding: 11px;
+  color: #172033;
+  background: white;
+}
+
+.actions-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.pipeline-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f7f8fb;
+}
+
+.step-index {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.pipeline-item strong,
+.pipeline-item small {
+  display: block;
+}
+
+.pipeline-item small {
+  margin-top: 4px;
+}
+
+.script-output {
+  border-radius: 10px;
+  padding: 12px;
+  background: #f7f8fb;
+}
+
+.muted-text {
+  color: #778198;
+}
+
+@media (max-width: 900px) {
+  .page-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    gap: 18px;
+  }
+
+  .sidebar-card {
+    margin-top: 0;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .content {
+    padding: 20px 14px;
+  }
+
+  .topbar,
+  .hero-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
 }
